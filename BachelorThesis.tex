@@ -23,13 +23,13 @@
 % Pokud nechceme nikomu dekovat makro zapoznamkujeme.
 \Acknowledgement{Rád bych na tomto místě poděkoval všem, kteří mi s prací pomohli, protože bez nich by tato práce nevznikla.}
 
-\CzechAbstract{Tato bakalářská práce se zabývá návrhem a realizací přenosného zařízení pro testování a monitorování počítačových sítí. Cílem práce bylo vytvořit autonomní nástroj schopný generovat a analyzovat síťový provoz protokolů IPv4 a IPv6. Hardwarové řešení je postaveno na jednodeskovém počítači Raspberry Pi, který je doplněn o dotykový displej a dva externí síťové adaptéry. Klíčovým přínosem softwarové části, implementované v jazyce Python s uživatelským rozhraním v knihovně Tkinter, je využití technologie Linux Network Namespaces (netns) pro logickou izolaci testovacích portů. Toto řešení úspěšně zamezuje konfliktům ve směrování při zapojení do stejné podsítě a umožňuje automatizované přidělování IP adres přes DHCP. Zařízení poskytuje funkce pro pasivní odposlech provozu, mapování topologie sítě pomocí ARP dotazů a aktivní měření výkonnostních parametrů, jako jsou propustnost, zpoždění a ztrátovost paketů. Funkčnost vyvinutého prototypu byla úspěšně ověřena v laboratorním prostředí.}
+\CzechAbstract{Tato bakalářská práce se zabývá návrhem a realizací přenosného zařízení pro testování, monitorování a bezpečnostní audit počítačových sítí. Cílem práce bylo vytvořit autonomní nástroj schopný generovat a analyzovat síťový provoz protokolů IPv4 a IPv6. Hardwarové řešení je postaveno na jednodeskovém počítači Raspberry Pi, který je doplněn o dotykový displej a dva externí síťové adaptéry. Klíčovým přínosem softwarové části, implementované v jazyce Python s vlastním grafickým rozhraním, je využití technologie Linux Network Namespaces (netns) pro logickou izolaci testovacích portů. Zařízení poskytuje funkce pro pasivní odposlech provozu, aktivní měření propustnosti nástrojem iperf3 a nově také pokročilý průzkum sítě (Network Reconnaissance) pomocí integrovaného skeneru Nmap, a to jak v metalických, tak bezdrátových sítích. Funkčnost vyvinutého prototypu byla úspěšně ověřena v laboratorním prostředí.}
 
-\CzechKeywords{počítačové sítě; monitorování sítě; generování provozu; Raspberry Pi; Network Namespaces; analýza provozu; IPv4; IPv6; propustnost sítě}
+\CzechKeywords{počítačové sítě; monitorování sítě; generování provozu; Raspberry Pi; Network Namespaces; Nmap; bezpečnostní audit; IPv4; IPv6; propustnost sítě}
 
-\EnglishAbstract{This bachelor thesis deals with the design and implementation of a portable device for testing and monitoring computer networks. The main objective was to create an autonomous tool capable of generating and analyzing IPv4 and IPv6 network traffic. The hardware solution is based on a Raspberry Pi single-board computer, equipped with a touch screen and two external network adapters. A key contribution of the software part, implemented in Python with a Tkinter graphical user interface, is the use of Linux Network Namespaces (netns) technology for the logical isolation of testing ports. This solution successfully prevents routing conflicts when connected to the same subnet and allows for automated IP address assignment via DHCP. The device provides features for passive traffic sniffing, network topology mapping using ARP requests, and active measurement of performance parameters such as throughput, latency, and packet loss. The functionality of the developed prototype was successfully verified in a laboratory environment.}
+\EnglishAbstract{This bachelor thesis deals with the design and implementation of a portable device for testing, monitoring, and security auditing of computer networks. The main objective was to create an autonomous tool capable of generating and analyzing IPv4 and IPv6 network traffic. The hardware solution is based on a Raspberry Pi single-board computer, equipped with a touch screen and two external network adapters. A key contribution of the software part, implemented in Python with a custom graphical user interface, is the use of Linux Network Namespaces (netns) technology for the logical isolation of testing ports. The device provides features for passive traffic sniffing, active throughput measurement using iperf3, and advanced network reconnaissance using the integrated Nmap scanner in both wired and wireless networks. The functionality of the developed prototype was successfully verified in a laboratory environment.}
 
-\EnglishKeywords{computer networks; network monitoring; traffic generation; Raspberry Pi; Network Namespaces; traffic analysis; IPv4; IPv6; network throughput}
+\EnglishKeywords{computer networks; network monitoring; traffic generation; Raspberry Pi; Network Namespaces; Nmap; security audit; IPv4; IPv6; network throughput}
 
 \AddAcronym{DVD}{Digital Versatile Disc}
 \AddAcronym{TNT}{Trinitrotoluen}
@@ -64,7 +64,6 @@
 \input{Chapters/Introduction.tex}
 \input{Chapters/SampleChapter2.tex} 
 \input{Chapters/SampleChapter1.tex} 
-\input{Chapters/TechnicalDetails.tex}
 \input{Chapters/Conclusion.tex}
 
 % Seznam literatury
@@ -74,9 +73,5 @@
 \appendix
 \input{Chapters/Appendix1.tex}
 \input{Chapters/Appendix2.tex}
-
-% Priloha vlozena primo do hlavniho LaTeX souboru. Ne vsechny prilohy je nutne mit ve zvlastnich souborech.
-\chapter{Dlouhý zdrojový kód}
-\lstinputlisting[label=src:CppExternal,caption={Dlouhý zdrojový kód v jazyce C++ načtený s externího souboru}]{SourceCodes/ArraySortingAlgorithms.cpp}
 
 \end{document}

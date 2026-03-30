@@ -10,7 +10,9 @@ Pro zajištění dostatečného výpočetního výkonu a kompatibility se síťo
 
 Aby zařízení splňovalo požadavek na přenositelnost a autonomii, je Raspberry Pi osazeno 5palcovým dotykovým displejem (HDMI LCD V2). Napájení displeje a přenos dat z dotykové vrstvy jsou realizovány prostřednictvím GPIO pinů, zatímco obrazový signál je přenášen standardním rozhraním HDMI. Díky tomuto řešení nevyžaduje analyzátor pro svůj provoz připojení externího monitoru, klávesnice ani myši.
 
-Jelikož integrované síťové rozhraní Raspberry Pi nedostačuje pro současné a vzájemně oddělené generování a naslouchání provozu, byla hardwarová architektura rozšířena o dva externí USB/LAN ethernetové adaptéry. Tyto adaptéry se v systému hlásí jako dvě nezávislá rozhraní označená jako \texttt{eth1} a \texttt{eth2}. První z nich slouží výhradně jako monitorovací rozhraní pro pasivní odposlech sítě. Druhý adaptér je dedikován pro aktivní testování sítě. Fyzické oddělení těchto rolí zabraňuje situaci, kdy by generovaný zátěžový provoz zpětně ovlivňoval statistiky zachycené naslouchajícím rozhraním.
+Jelikož integrované síťové rozhraní Raspberry Pi nedostačuje pro současné a vzájemně oddělené generování a naslouchání provozu, byla hardwarová architektura rozšířena o dva externí USB/LAN ethernetové adaptéry. Tyto adaptéry se v systému hlásí jako dvě nezávislá rozhraní označená jako \texttt{eth1} a \texttt{eth2}.
+
+První z nich slouží výhradně jako monitorovací rozhraní pro pasivní odposlech sítě. Druhý adaptér je dedikován pro aktivní testování sítě. Fyzické oddělení těchto rolí zabraňuje situaci, kdy by generovaný zátěžový provoz zpětně ovlivňoval statistiky zachycené naslouchajícím rozhraním.
 
 \section{Realizace generátoru a analyzátoru provozu}
 \label{sec:realizace_generatoru}
@@ -19,7 +21,11 @@ Základním stavebním kamenem softwarové architektury je operační systém za
 
 Pro zajištění autonomie byl do izolovaných prostorů integrován DHCP server dnsmasq. Zásadním krokem při realizaci byla plná implementace a podpora protokolu IPv6. Po připojení k cílové stanici přidělí analyzátor automaticky nejen standardní IPv4 adresy, ale prostřednictvím odesílání zpráv Router Advertisement (RA) přidělí i unikátní lokální IPv6 adresy z rozsahu \texttt{fd00::/64}.
 
-Uživatelské rozhraní je naprogramováno v jazyce Python s využitím knihovny Tkinter. Aplikace plní roli centrálního řídicího panelu. Pro pasivní odposlech je využíván nástroj tcpdump. Mapování topologie sítě probíhá prostřednictvím knihovny Scapy. Aktivní zátěžové testy jsou realizovány nástrojem iperf3, přičemž uživatelské rozhraní obsahuje dedikované spouštěcí rutiny odděleně pro protokoly IPv4 a IPv6, aby bylo možné nezávisle porovnávat jejich chování a výkon.
+Uživatelské rozhraní je naprogramováno v jazyce Python s využitím knihovny Tkinter. Aplikace plní roli centrálního řídicího panelu. Za účelem maximalizace uživatelského komfortu při ovládání přes dotykový displej byla do aplikace naprogramována vlastní virtuální číselná klávesnice (Numpad). Tím zcela odpadá nutnost připojovat k analyzátoru externí hardwarovou klávesnici při zadávání IP adres.
+
+Klíčovým rozšířením softwarové části je integrace bezpečnostního skeneru Nmap pro aktivní síťový průzkum (Network Reconnaissance). Uživatelské rozhraní umožňuje spouštět audity ve dvou režimech: kabelové skenování (LAN) zevnitř izolovaného prostoru a bezdrátové skenování přes integrovaný Wi-Fi modul s funkcí automatické detekce IP adresy výchozí brány.
+
+Pro pasivní odposlech je využíván nástroj tcpdump, pro mapování topologie knihovna Scapy a aktivní zátěžové testy jsou realizovány nástrojem iperf3, odděleně pro protokoly IPv4 a IPv6.
 
 \section{Zhodnocení dosažených výsledků}
 \label{sec:zhodnoceni}
@@ -28,16 +34,16 @@ Funkčnost navrženého řešení byla ověřena v laboratoři počítačových 
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.85\textwidth, angle=0]{Figures/connected_device.jpg}
+    \includegraphics[width=0.85\textwidth, angle=0]{Figures/connected_device.JPG}
     \caption{Fyzické zapojení analyzátoru a cílové stanice v laboratoři}
     \label{fig:zapojeni}
 \end{figure}
 
-Následně byly provedeny testy dostupnosti (ICMP Echo Request pro IPv4 a ICMPv6 pro IPv6), které potvrdily stabilní spojení s nulovou ztrátovostí paketů. Nejvýznamnější částí testování bylo ověření maximální propustnosti sítě pomocí zátěžového generátoru iperf3. 
+Následně byly provedeny testy dostupnosti (ICMP Echo Request pro IPv4 a ICMPv6 pro IPv6), které potvrdily stabilní spojení s nulovou ztrátovostí paketů. Nejvýznamnější částí testování bylo ověření maximální propustnosti sítě pomocí zátěžového generátoru iperf3.
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.8\textwidth]{Figures/gui_speedv4.jpg}
+    \includegraphics[width=0.8\textwidth]{Figures/gui_speedv4.JPG}
     \caption{Měření propustnosti sítě protokolem IPv4}
     \label{fig:speedv4}
 \end{figure}
@@ -46,12 +52,30 @@ Při testování propustnosti nad protokolem IPv4 dosáhla síť průměrné ryc
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.8\textwidth]{Figures/gui_speedv6.jpg}
+    \includegraphics[width=0.8\textwidth]{Figures/gui_speedv6.JPG}
     \caption{Měření propustnosti sítě protokolem IPv6}
     \label{fig:speedv6}
 \end{figure}
 
-Správnost a úspěšnost obou zátěžových testů potvrdily také logy zachycené na straně cílového serveru (viz Obrázek \ref{fig:iperf_server}), které prokazují paralelní schopnost analyzátoru pracovat v obou adresních prostorech bez konfliktů ve směrování. Zařízení tak plně splnilo definované cíle.
+Kromě měření propustnosti byla otestována také nově integrovaná funkce bezpečnostního skeneru Nmap. Obrázek \ref{fig:nmap_lan} ilustruje výstup skenování cílové stanice přes izolované ethernetové rozhraní, kde analyzátor správně identifikoval otevřený port služby SSH a detekoval OS Ubuntu Linux. Skutečnost, že při záměrném pokusu o naskenování adresy z podsítě monitorovacího portu (\texttt{10.0.1.x}) nebyly přístrojem z logických důvodů nalezeny žádné cíle, empiricky potvrzuje bezchybné fungování a absolutní izolaci vnitřních prostorů Network Namespaces.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{Figures/gui_nmap_lan_scan.JPG}
+    \caption{Výsledek bezpečnostního skenování Nmap v izolovaném prostředí (LAN)}
+    \label{fig:nmap_lan}
+\end{figure}
+
+Taktéž proběhlo úspěšné ověření bezdrátového průzkumu (viz Obrázek \ref{fig:nmap_wifi}), kde program automaticky detekoval IP adresu přístupového bodu. 
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{Figures/gui_nmap_wifi_scan.JPG}
+    \caption{Bezdrátové skenování sítě s využitím automatické detekce výchozí brány (Wi-Fi)}
+    \label{fig:nmap_wifi}
+\end{figure}
+
+Správnost obou zátěžových testů potvrdily také logy zachycené na straně cílového serveru (viz Obrázek \ref{fig:iperf_server}), které prokazují paralelní schopnost analyzátoru pracovat v obou adresních prostorech bez konfliktů ve směrování. Zařízení tak plně splnilo definované cíle.
 
 \begin{figure}[htbp]
     \centering
