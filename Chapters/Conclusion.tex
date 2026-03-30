@@ -1,0 +1,10 @@
+\chapter{Závěr}
+\label{sec:zaver}
+
+Cílem této bakalářské práce bylo navrhnout a realizovat přenosné zařízení pro testování a monitorování počítačových sítí s plnou podporou protokolů IPv4 a IPv6. Lze konstatovat, že tento cíl byl v plném rozsahu splněn.
+
+V rámci praktické části bylo sestaveno hardwarové řešení založené na platformě Raspberry Pi, které je díky integrovanému dotykovému displeji plně autonomní a nevyžaduje připojení externích periférií. Zásadním přínosem práce je softwarová implementace využívající technologii Linux Network Namespaces (netns). Ta umožnila logické oddělení dvou fyzických síťových rozhraní, čímž se efektivně předešlo konfliktům ve směrování a zajistila se vysoká přesnost měření. Zařízení bylo úspěšně vybaveno vlastní aplikací s grafickým uživatelským rozhraním naprogramovaným v jazyce Python.
+
+Během laboratorního testování analyzátor bezpečně prokázal svou funkčnost. Byla ověřena úspěšná automatická konfigurace sítě na cílové stanici pomocí vlastního integrovaného DHCP serveru, a to jak pro adresní prostor IPv4, tak i pro IPv6. Následné zátěžové testy nástrojem iperf3 potvrdily, že zařízení je schopno spolehlivě generovat a analyzovat provoz o rychlosti dosahující 276 Mbps pro protokol IPv4 a 274 Mbps pro protokol IPv6, a to bez jakýchkoliv ztrát paketů nebo chyb ve směrování. 
+
+Navržené zařízení tak představuje plně funkční, cenově dostupný a flexibilní nástroj pro síťovou diagnostiku. Do budoucna, jak bylo požadováno v zadání, by bylo možné tento prototyp dále rozšířit. Nabízí se například integrace bateriového modulu pro zajištění ještě větší mobility v terénu, nebo přidání podpory pro bezdrátové sítě Wi-Fi, což by umožnilo komplexní monitorování i bezdrátového provozu.

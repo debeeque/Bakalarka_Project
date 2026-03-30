@@ -1,0 +1,61 @@
+\chapter{Návrh a realizace, zhodnocení výsledků}
+\label{sec:realizace}
+
+Tato kapitola detailně popisuje praktickou část bakalářské práce. Text je strukturován přesně podle fází vývoje prototypu: od fyzického návrhu hardwaru, přes implementaci softwarových nástrojů pro generování a analýzu provozu, až po finální zhodnocení dosažených výsledků v laboratorním prostředí.
+
+\section{Návrh přenosného zařízení}
+\label{sec:navrh_zarizeni}
+
+Pro zajištění dostatečného výpočetního výkonu a kompatibility se síťovými nástroji byl jako hlavní výpočetní jednotka zvolen jednodeskový počítač Raspberry Pi 3 Model B+. Tato platforma poskytuje nativní podporu pro operační systémy na bázi Linuxu, což je kritický požadavek pro pokročilou manipulaci se síťovými rozhraními a routováním.
+
+Aby zařízení splňovalo požadavek na přenositelnost a autonomii, je Raspberry Pi osazeno 5palcovým dotykovým displejem (HDMI LCD V2). Napájení displeje a přenos dat z dotykové vrstvy jsou realizovány prostřednictvím GPIO pinů, zatímco obrazový signál je přenášen standardním rozhraním HDMI. Díky tomuto řešení nevyžaduje analyzátor pro svůj provoz připojení externího monitoru, klávesnice ani myši.
+
+Jelikož integrované síťové rozhraní Raspberry Pi nedostačuje pro současné a vzájemně oddělené generování a naslouchání provozu, byla hardwarová architektura rozšířena o dva externí USB/LAN ethernetové adaptéry. Tyto adaptéry se v systému hlásí jako dvě nezávislá rozhraní označená jako \texttt{eth1} a \texttt{eth2}. První z nich slouží výhradně jako monitorovací rozhraní pro pasivní odposlech sítě. Druhý adaptér je dedikován pro aktivní testování sítě. Fyzické oddělení těchto rolí zabraňuje situaci, kdy by generovaný zátěžový provoz zpětně ovlivňoval statistiky zachycené naslouchajícím rozhraním.
+
+\section{Realizace generátoru a analyzátoru provozu}
+\label{sec:realizace_generatoru}
+
+Základním stavebním kamenem softwarové architektury je operační systém založený na jádře Linux. Jelikož analyzátor využívá dvě fyzická síťová rozhraní zapojená do stejného síťového segmentu, vyvstává problém s výchozím směrováním. Tento problém byl úspěšně vyřešen implementací technologie Linux Network Namespaces (netns). V rámci inicializačního skriptu jsou automaticky vytvořeny dva nezávislé jmenné prostory, do kterých jsou přesunuta fyzická rozhraní. Každý prostor disponuje vlastní směrovací tabulkou.
+
+Pro zajištění autonomie byl do izolovaných prostorů integrován DHCP server dnsmasq. Zásadním krokem při realizaci byla plná implementace a podpora protokolu IPv6. Po připojení k cílové stanici přidělí analyzátor automaticky nejen standardní IPv4 adresy, ale prostřednictvím odesílání zpráv Router Advertisement (RA) přidělí i unikátní lokální IPv6 adresy z rozsahu \texttt{fd00::/64}.
+
+Uživatelské rozhraní je naprogramováno v jazyce Python s využitím knihovny Tkinter. Aplikace plní roli centrálního řídicího panelu. Pro pasivní odposlech je využíván nástroj tcpdump. Mapování topologie sítě probíhá prostřednictvím knihovny Scapy. Aktivní zátěžové testy jsou realizovány nástrojem iperf3, přičemž uživatelské rozhraní obsahuje dedikované spouštěcí rutiny odděleně pro protokoly IPv4 a IPv6, aby bylo možné nezávisle porovnávat jejich chování a výkon.
+
+\section{Zhodnocení dosažených výsledků}
+\label{sec:zhodnoceni}
+
+Funkčnost navrženého řešení byla ověřena v laboratoři počítačových sítí. Analyzátor byl fyzicky propojen dvěma ethernetovými kabely s cílovou stanicí vybavenou operačním systémem Linux (viz Obrázek \ref{fig:zapojeni}). Cílová stanice úspěšně přijala dynamické IPv4 i IPv6 adresy pro obě svá rozhraní.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.85\textwidth, angle=0]{Figures/connected_device.jpg}
+    \caption{Fyzické zapojení analyzátoru a cílové stanice v laboratoři}
+    \label{fig:zapojeni}
+\end{figure}
+
+Následně byly provedeny testy dostupnosti (ICMP Echo Request pro IPv4 a ICMPv6 pro IPv6), které potvrdily stabilní spojení s nulovou ztrátovostí paketů. Nejvýznamnější částí testování bylo ověření maximální propustnosti sítě pomocí zátěžového generátoru iperf3. 
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{Figures/gui_speedv4.jpg}
+    \caption{Měření propustnosti sítě protokolem IPv4}
+    \label{fig:speedv4}
+\end{figure}
+
+Při testování propustnosti nad protokolem IPv4 dosáhla síť průměrné rychlosti 276 Mbps (viz Obrázek \ref{fig:speedv4}). Následný test využívající protokol IPv6 prokázal propustnost 274 Mbps (viz Obrázek \ref{fig:speedv6}). Drobné snížení propustnosti u protokolu IPv6 (o 2 Mbps) plně koresponduje s teoretickými předpoklady, jelikož základní hlavička protokolu IPv6 (40 bajtů) je dvakrát větší než hlavička protokolu IPv4 (20 bajtů), což mírně zvyšuje režii na síťové vrstvě.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{Figures/gui_speedv6.jpg}
+    \caption{Měření propustnosti sítě protokolem IPv6}
+    \label{fig:speedv6}
+\end{figure}
+
+Správnost a úspěšnost obou zátěžových testů potvrdily také logy zachycené na straně cílového serveru (viz Obrázek \ref{fig:iperf_server}), které prokazují paralelní schopnost analyzátoru pracovat v obou adresních prostorech bez konfliktů ve směrování. Zařízení tak plně splnilo definované cíle.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.9\textwidth]{Figures/iperf_tests.png}
+    \caption{Výstup nástroje iperf3 na straně cílového serveru (IPv4 i IPv6 spojení)}
+    \label{fig:iperf_server}
+\end{figure}

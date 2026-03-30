@@ -1,0 +1,23 @@
+\chapter{Teoretická východiska a analýza problematiky}
+\label{sec:teorie}
+
+Tato kapitola se věnuje teoretickým základům, na kterých je postaveno navržené testovací a monitorovací zařízení. Porozumění těmto konceptům je nezbytné pro správnou interpretaci dat získaných při analýze sítě.
+
+\section{Protokoly síťové vrstvy a jejich výkonnostní rozdíly}
+\label{sec:ipv4_ipv6}
+
+Moderní počítačové sítě spoléhají na koexistenci protokolů IPv4 a IPv6 \cite{nastase2024}. Ačkoliv je protokol IPv6 moderním standardem řešícím vyčerpání adresního prostoru, přináší sebou určitou strukturální režii na úrovni paketů. Zatímco IPv4 využívá základní hlavičku o minimální velikosti 20 bajtů, protokol IPv6 disponuje fixní hlavičkou o velikosti 40 bajtů. Tato dvojnásobná velikost na síťové vrstvě způsobuje vyšší režii (overhead) při přenosu užitečného zatížení. 
+
+Jak dokládají nedávné studie \cite{tuifaiga2021}, protokol IPv4 v lokálních sítích stále dosahuje o něco vyšší propustnosti a nižší latence ve srovnání s IPv6. Vyšší režie hlavičky u IPv6 se projevuje mírným snížením celkové aplikační propustnosti, což je kritický faktor, který je nutné zohlednit při vyhodnocování zátěžových testů.
+
+\section{Monitorování a generování síťového provozu}
+\label{sec:monitorovani}
+
+Metodika měření propustnosti a latence v počítačových sítích vyžaduje kombinaci aktivního generování zátěže a pasivního odposlechu. Výzkumné práce \cite{gal2021} prokazují vysokou efektivitu využití klientsko-serverové architektury nástroje iperf3 pro přesné generování masivních TCP a UDP datových toků. Pro detailní inspekci těchto toků se pak paralelně využívá nízkoúrovňový nástroj tcpdump, který zachytává provoz přímo na úrovni jádra operačního systému.
+
+Pro komplexnější manipulaci s pakety a mapování síťové topologie se využívají specializované knihovny, jako je Scapy v jazyce Python \cite{carter2024}. Tyto nástroje umožňují konstrukci vlastních rámců, což je nezbytné například pro aktivní detekci uzlů pomocí protokolů ARP či ICMP.
+
+\section{Architektura Linux Network Namespaces (netns)}
+\label{sec:netns_teorie}
+
+Pro realizaci autonomního testování na jediném fyzickém stroji se využívá technologie Linux Network Namespaces (netns). Tato technologie poskytuje logickou izolaci síťových prostředků přímo na úrovni jádra OS. Každý jmenný prostor udržuje své vlastní nezávislé instance síťového zásobníku, což zahrnuje izolované směrovací tabulky, pravidla brány firewall a nezávislá síťová rozhraní. Při vytvoření nového jmenného prostoru je tento prostor zpočátku zcela prázdný (obsahuje pouze loopback), což znemožňuje nechtěné interference s hlavním síťovým stackem hostitelského systému a umožňuje bezpečné paralelní testování různých síťových segmentů.
