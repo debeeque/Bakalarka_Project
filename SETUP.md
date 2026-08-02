@@ -379,34 +379,114 @@ ssh malina
 
 ---
 
-## Часть 8. Huawei (Linux)
+## Часть 8. Huawei (Arch Linux)
+
+### 1. Пакеты
 
 ```bash
-sudo pacman -S git texlive-basic texlive-latexextra texlive-bibtexextra \
-               texlive-langczechslovak texlive-fontsrecommended biber python
-git clone https://github.com/debeeque/Bakalarka_Project.git ~/Bakalarka
+sudo pacman -S --needed git python biber \
+    texlive-basic texlive-latex texlive-latexrecommended texlive-latexextra \
+    texlive-bibtexextra texlive-fontsrecommended texlive-langczechslovak \
+    texlive-binextra
 ```
 
-Дальше в Cowork на Huawei подключаешь папку `~/Bakalarka` — `CLAUDE.md` тот же,
-контекст тот же.
+Что за что отвечает:
 
-**Правило синхронизации:** `git pull` перед началом работы, `git push` после.
-Иначе получишь расхождение между ноутами и будешь разбирать конфликты вручную.
+| Пакет | Зачем именно нам |
+|---|---|
+| `texlive-binextra` | **`latexmk`** — он живёт здесь, а не в `texlive-basic` |
+| `texlive-latexextra` | `pdfx` (PDF/A), `pdfpages`, `titlesec`, `subfig`, `tocbibind`, `xmpincl` |
+| `texlive-latexrecommended` | `csquotes`, `listings` |
+| `texlive-bibtexextra` | `biblatex` и стиль `biblatex-iso690` |
+| `texlive-langczechslovak` | `babel-czech` — чешские переносы и типографика |
+| `texlive-fontsrecommended` | Latin Modern, требуемый регламентом шрифт |
+| `biber` | обработчик библиографии, отдельный пакет |
 
-Задание (`ThesisSpecification_...pdf`) приедет вместе с репозиторием, когда ты
-закоммитишь его на Acer.
+На Arch TeX Live разбит на части, и `latexmk` в `texlive-binextra` — это самая
+частая причина «поставил texlive, а latexmk не находится».
+
+Проверка: `latexmk --version && biber --version && git --version`
+
+### 2. Репозиторий
+
+```bash
+git config --global user.name "debeeque"
+git config --global user.email "skala123458@gmail.com"
+
+git clone https://github.com/debeeque/Bakalarka_Project.git ~/Bakalarka
+cd ~/Bakalarka
+latexmk -pdf BachelorThesis.tex
+```
+
+`git config` нужен по той же причине, что и на Acer, — без него первый же
+коммит упрётся в «Author identity unknown».
+
+Задание и логотип приедут вместе с репозиторием — они закоммичены.
+
+### 3. Ключ на малину
+
+В лаборатории ты подключаешься к устройству именно с Huawei, поэтому ключ нужен
+и здесь. На Linux всё короче, чем в винде:
+
+```bash
+ssh-keygen -t ed25519 -C "bakalarka-huawei"     # три раза Enter
+ssh-copy-id muk0015@raspberrypi.local
+```
+
+`ssh-copy-id` на Linux есть из коробки, городить конструкцию с переменной, как
+в PowerShell, не нужно.
+
+Тот же короткий алиас — создай `~/.ssh/config`:
+
+```
+Host malina
+    HostName raspberrypi.local
+    User muk0015
+    IdentityFile ~/.ssh/id_ed25519
+    ServerAliveInterval 30
+```
+
+```bash
+chmod 600 ~/.ssh/config
+ssh malina
+```
+
+Ключи у ноутбуков **разные, и это правильно** — каждый со своим. Потеряешь один
+ноутбук, удалишь одну строку из `authorized_keys`, второй продолжит работать.
+
+### 4. Подключить папку
+
+В Cowork на Huawei подключаешь `~/Bakalarka` — `CLAUDE.md` тот же, контекст тот
+же, начинать заново ничего не нужно.
+
+### Правило синхронизации
+
+`git pull` перед началом работы, `git push` после. Всегда, на обоих ноутбуках.
+Иначе получишь расхождение и будешь разбирать конфликты руками — на LaTeX это
+особенно неприятно.
 
 ---
 
 ## Чек-лист
 
-- [ ] Папка переехала в `C:\Projects\Bakalarka`
-- [ ] `git`, `python`, `perl`, `latexmk`, `node` отвечают на `--version`
-- [ ] MiKTeX Console → install missing packages = **Always**
-- [ ] `git push` прошёл, GitHub обновился
-- [ ] `ThesisSpecification_...pdf` лежит в корне
-- [ ] `latexmk -pdf BachelorThesis.tex` собрал PDF
-- [ ] Проект в Claude создан, папка подключена
-- [ ] Claude Code запускается
-- [ ] SSH-ключ на малине работает без пароля
+**Acer (Windows 11)**
+
+- [x] Папка переехала в `C:\Projects\Bakalarka`
+- [x] `git`, `python`, `perl`, `latexmk` отвечают на `--version`
+- [x] MiKTeX Console → install missing packages = **Always**
+- [x] `git push` прошёл, GitHub обновился
+- [x] `ThesisSpecification_...pdf` и `Figures/FEI_CZ.pdf` на месте
+- [x] `latexmk -pdf BachelorThesis.tex` собрал PDF, формат **A4** проверен
+- [x] Проект в Claude создан, папка подключена
+- [x] SSH-ключ на малине работает без пароля
+- [ ] Поле **Instructions** в проекте заполнено (Часть 6)
+
+**Huawei (Arch)**
+
+- [x] `git config` с именем и почтой
+- [x] Репозиторий склонирован в `~/Bakalarka`
+- [x] SSH-ключ на малине работает, алиас `ssh malina`
+- [ ] Папка `~/Bakalarka` подключена в Claude
+- [ ] ~~TeX Live~~ — не нужен, пока не понадобится собирать PDF в лаборатории
+- [ ] mDNS (`avahi` + `nss-mdns`), чтобы `raspberrypi.local` резолвился
 - [ ] Huawei клонировал репозиторий
