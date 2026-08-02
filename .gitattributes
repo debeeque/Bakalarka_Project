@@ -1,0 +1,19 @@
+# Скрипты и код исполняются на Linux (Raspberry Pi, Huawei) —
+# перевод строк обязан оставаться LF, иначе bash отвечает
+# "bad interpreter: /bin/bash^M" и скрипт не запускается.
+*.sh text eol=lf
+*.py text eol=lf
+
+# Исходники работы — тоже LF, чтобы не было мусорных диффов между ноутами
+*.tex text eol=lf
+*.cls text eol=lf
+*.sty text eol=lf
+*.bib text eol=lf
+*.md  text eol=lf
+
+# Бинарники не трогать
+*.pdf binary
+*.jpg binary
+*.JPG binary
+*.png binary
+*.icm binary

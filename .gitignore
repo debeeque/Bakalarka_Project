@@ -12,10 +12,15 @@
 *.run.xml
 *.synctex.gz
 *.toc
+*.bbl-SAVE-ERROR
 
 # Compiled PDF and archives
 *.pdf
 *.zip
+
+# ВАЖНО: задание обязано лежать в репозитории —
+# diploma.cls вшивает его через \includepdf, без него работа не соберётся
+!ThesisSpecification_MUK0015_vsboee250462E0.pdf
 
 # IDE settings
 .vscode/
