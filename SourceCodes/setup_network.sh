@@ -24,7 +24,7 @@ ip netns exec analyzer_monitor ip link set lo up
 # Initialize DHCP (IPv4 + IPv6) for Monitor
 ip netns exec analyzer_monitor dnsmasq --interface=eth1 --bind-interfaces \
   --dhcp-range=10.0.1.20,10.0.1.20,255.255.255.0,12h \
-  --dhcp-range=fd00:1::20,fd00:1::20,64,12h --enable-ra \
+  --dhcp-range=fd00:1::20,fd00:1::20,slaac,64,12h --enable-ra \
   --pid-file=/tmp/dnsmasq_monitor.pid
 
 # ==========================================
@@ -38,7 +38,7 @@ ip netns exec analyzer_sender ip link set lo up
 # Initialize DHCP (IPv4 + IPv6) for Sender
 ip netns exec analyzer_sender dnsmasq --interface=eth2 --bind-interfaces \
   --dhcp-range=10.0.2.20,10.0.2.20,255.255.255.0,12h \
-  --dhcp-range=fd00:2::20,fd00:2::20,64,12h --enable-ra \
+  --dhcp-range=fd00:2::20,fd00:2::20,slaac,64,12h --enable-ra \
   --pid-file=/tmp/dnsmasq_sender.pid
 
 echo "Network setup complete. IPv4 and IPv6 isolated modes active."

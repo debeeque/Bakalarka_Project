@@ -123,6 +123,12 @@ class AnalyzerApp:
         else:
             self.ip_entry.insert(tk.END, key)
 
+    def netns_for(self, target):
+        t = target.strip().lower()
+        if t.startswith("10.0.1.") or t.startswith("fd00:1:"):
+            return "analyzer_monitor"
+        return "analyzer_sender"
+
     def run_nmap(self):
         if self.test_running: return
         target = self.ip_entry.get().strip()
@@ -138,7 +144,9 @@ class AnalyzerApp:
             base_nmap = ["nmap", "-F", "-sV", "-T4", "--max-retries", "1", "--host-timeout", "30s", target]
             
             if mode == "LAN":
-                cmd = ["sudo", "ip", "netns", "exec", "analyzer_sender"] + base_nmap
+                ns = self.netns_for(target)
+                self.log(f"Recon: using namespace {ns}")
+                cmd = ["sudo", "ip", "netns", "exec", ns] + base_nmap
             else:
                 cmd = ["sudo"] + base_nmap
 
@@ -166,7 +174,7 @@ class AnalyzerApp:
         self.test_running = True
 
         def task():
-            cmd = ["sudo", "ip", "netns", "exec", "analyzer_sender", "iperf3", "-c", target, "-t", "5"]
+            cmd = ["sudo", "ip", "netns", "exec", self.netns_for(target), "iperf3", "-c", target, "-t", "5"]
             res = subprocess.run(cmd, capture_output=True, text=True)
             
             if "error" in res.stderr or "error" in res.stdout:
@@ -199,7 +207,7 @@ class AnalyzerApp:
 
         def task():
             ping_cmd = "ping" if not is_ipv6 else "ping6"
-            cmd = ["sudo", "ip", "netns", "exec", "analyzer_sender", ping_cmd, target, "-c", "4"]
+            cmd = ["sudo", "ip", "netns", "exec", self.netns_for(target), ping_cmd, target, "-c", "4"]
             res = subprocess.run(cmd, capture_output=True, text=True)
             self.log("-" * 20)
             self.log(res.stdout)
