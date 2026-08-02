@@ -14,13 +14,12 @@
 *.toc
 *.bbl-SAVE-ERROR
 
-# Compiled PDF and archives
-*.pdf
+# Собранный PDF и архивы.
+# НЕ ставить сюда общее правило *.pdf: шаблону нужны исходные PDF —
+# логотип факультета Figures/FEI_CZ.pdf и задание, которое diploma.cls
+# вшивает через \includepdf. Без них работа не собирается.
+BachelorThesis.pdf
 *.zip
-
-# ВАЖНО: задание обязано лежать в репозитории —
-# diploma.cls вшивает его через \includepdf, без него работа не соберётся
-!ThesisSpecification_MUK0015_vsboee250462E0.pdf
 
 # IDE settings
 .vscode/
