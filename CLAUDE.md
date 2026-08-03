@@ -92,7 +92,12 @@
 - Главный файл `BachelorThesis.tex`, главы в `Chapters/`, картинки в `Figures/`,
   коды приложений в `SourceCodes/`
 - Порядок глав уже исправлен по замечанию научрука: теория идёт **перед** практикой
-- Библиография: `biblatex`, style `iso-numeric` (= норма ČSN ISO 690)
+- Библиография: `biblatex`, style `iso-numeric` (= норма ČSN ISO 690).
+  **С 03.08.2026 источники в `literature.bib`**, `\addbibresource` переключён
+  на него. Шаблонный `biblatex-examples.bib` больше не подключён — его мусорные
+  ключи (`cms`, `ctan`, `coffee` и прочее) остались только в
+  `Chapters/TechnicalDetails.tex`, который в сборку не входит. Если этот файл
+  когда-нибудь подключать — сперва вычистить из него все `\cite`.
 
 Формальные требования факультета — в `_context/02_fei_requirements.md`.
 Самое жёсткое оттуда:
@@ -109,14 +114,29 @@
 Реальные источники, на которые опирается работа:
 
 1. NASTASE, R. A. *IPv6 Protocol for Beginners*. Blurb, 2024. ISBN 979-8210198082.
+   → раздел автоконфигурации в теории и в практике.
 2. TUIFAIGA, A. A.; RAM, P. A.; KOLAHI, S. S. *Performance Comparison of IPv6 in
    802.11ac WLAN in Windows and Linux Environment*. TENCON 2021, s. 799–804.
-   doi:10.1109/tencon54134.2021.9707449
+   doi:10.1109/tencon54134.2021.9707449 → сравнение пропускной способности.
 3. GÁL, Z.; KOCSIS, G.; TAJTI, T.; TORNAI, R. *Performance evaluation of massively
    parallel and high speed connectionless vs. connection oriented communication
    sessions*. Advances in Engineering Software, 2021, 157-158, 103010.
-   doi:10.1016/j.advengsoft.2021.103010
+   doi:10.1016/j.advengsoft.2021.103010 → методика измерений iperf3.
 4. CARTER, T. *Network Security with Python and Scapy*. Kindle Edition, 2024.
+   → Scapy, Nmap, автоматизация аудита.
+
+RFC, добавлены 03.08.2026 (все проверены на rfc-editor.org, DOI указаны в
+`literature.bib`):
+
+5. RFC 8200 — *IPv6 Specification*, Deering, Hinden, 07/2017.
+6. RFC 4291 — *IP Version 6 Addressing Architecture*, Hinden, Deering, 02/2006
+   → структура адреса, EUI-64.
+7. RFC 4193 — *Unique Local IPv6 Unicast Addresses*, Hinden, Haberman, 10/2005
+   → обоснование `fd00::/8` для изолированного стенда.
+8. RFC 4861 — *Neighbor Discovery for IPv6*, Narten и др., 09/2007 → RS/RA, DAD.
+9. RFC 4862 — *IPv6 Stateless Address Autoconfiguration*, Thomson и др., 09/2007
+   → SLAAC, флаги.
+10. RFC 8415 — *DHCPv6*, Mrugalski и др., 11/2018 → стателфул-альтернатива.
 
 > На защите комиссия может спросить по **каждому** источнику, где именно он
 > использован в тексте. Мусорные примеры из шаблона (`coffee.bib`,
@@ -187,18 +207,20 @@ analyzátoru provozu*, *Zhodnocení dosažených výsledků*.
 - ~~Пять скриншотов не вставлены в текст~~ — **вставлены 03.08.2026.** `gui.JPG` и
   `gui_setup_net.JPG` в *Realizace*, `gui_pingv4/v6.JPG` и `gui_arp_scan.JPG` в
   *Zhodnocení*. Все `\ref` разрешаются, проверено пробной сборкой.
-- Текст «жидкий» по наполнению. Замеры на 03.08.2026:
+- Текст «жидкий» по наполнению. Замеры на 03.08.2026 (вечер):
 
   | Глава | Слов | Было 30.03 |
   |---|---|---|
   | `Introduction.tex` — Úvod | 236 | 236 |
-  | `SampleChapter2.tex` — Teoretická východiska a analýza problematiky | 388 | 384 |
+  | `SampleChapter2.tex` — Teoretická východiska a analýza problematiky | 1 171 | 384 |
   | `SampleChapter1.tex` — Návrh a realizace, zhodnocení výsledků | 1 903 | 796 |
   | `Conclusion.tex` — Závěr | 531 | 259 |
-  | **Итого** | **~3 055** | ~1 675 |
+  | **Итого** | **~3 838** | ~1 675 |
 
-  25 страниц — это примерно **6 000–7 000 слов**. Написана примерно половина,
-  и сильнее всего просела теория (нужно ~10 страниц ≈ 2 500 слов, есть 388).
+  25 страниц — это примерно **6 000–7 000 слов**. Написано около 60%.
+  Теории нужно ~2 500 слов, есть 1 171 — то есть ещё примерно столько же.
+  Не хватает секции *analýza problematiky* (обзор существующих решений,
+  обоснование своего прибора) — название главы её обещает, а её нет.
 - `Chapters/TechnicalDetails.tex` — остаток шаблона, в `BachelorThesis.tex` не
   подключён. Либо наполнить, либо удалить.
 - `Prilohy` (`Chapters/Appendix1.tex`, `Appendix2.tex`) не наполнены; коды лежат

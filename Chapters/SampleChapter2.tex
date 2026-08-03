@@ -10,6 +10,42 @@ Moderní počítačové sítě spoléhají na koexistenci protokolů IPv4 a IPv6
 
 Jak dokládají nedávné studie \cite{tuifaiga2021}, protokol IPv4 v lokálních sítích stále dosahuje o něco vyšší propustnosti a nižší latence ve srovnání s IPv6. Vyšší režie hlavičky u IPv6 se projevuje mírným snížením celkové aplikační propustnosti, což je kritický faktor, který je nutné zohlednit při vyhodnocování zátěžových testů.
 
+\section{Adresace a automatická konfigurace protokolu IPv6}
+\label{sec:ipv6_adresace}
+
+Rozdíl mezi oběma protokoly se neomezuje na velikost hlavičky. Podstatnější pro přenosný analyzátor je odlišný způsob, jakým se stanice ke své adrese vůbec dostane, neboť právě na něm závisí, zda přístroj dokáže oslovit protistranu bez jakékoli předchozí domluvy s její obsluhou. Této otázce je proto věnována samostatná podkapitola.
+
+Adresa protokolu IPv6 má délku 128 bitů a její struktura je definována adresní architekturou \cite{rfc4291}, samotný protokol pak dokumentem \cite{rfc8200}. Zápis se člení do osmi skupin po čtyřech hexadecimálních číslicích, přičemž nejdelší souvislý úsek nulových skupin lze nahradit dvojicí dvojteček. Pro účely testovacího zařízení jsou podstatné tři kategorie adres. Adresa lokální linky z rozsahu \texttt{fe80::/10} vzniká na každém rozhraní automaticky ve chvíli, kdy je linka zdvižena, a platí pouze v rámci jednoho fyzického segmentu. Adresa globálního dosahu je směrovatelná v celém Internetu. Mezi nimi stojí kategorie jedinečných lokálních adres, která je pro navržené zařízení nejzajímavější.
+
+Jedinečné lokální adresy jsou vymezeny prefixem \texttt{fc00::/7}, přičemž osmý bit rozlišuje způsob přidělení; při jeho nastavení, tedy pro prefix \texttt{fd00::/8}, si organizace generuje čtyřicetibitový identifikátor sama pseudonáhodným postupem \cite{rfc4193}. Takto vzniklý prefix je s velmi vysokou pravděpodobností jedinečný, není směrovatelný v Internetu a nezávisí na žádném poskytovateli připojení. Právě tyto vlastnosti odpovídají povaze přenosného analyzátoru, který pracuje v uzavřeném testovacím segmentu, nemá trvalé připojení k Internetu a jehož adresní plán nesmí kolidovat s adresami sítě, do níž je přístroj dočasně zapojen.
+
+Druhou polovinu adresy tvoří identifikátor rozhraní o délce 64 bitů. Jeden ze způsobů jeho odvození, popsaný v adresní architektuře \cite{rfc4291}, vychází z fyzické adresy rozhraní a označuje se jako EUI-64. Osmačtyřicetibitová adresa se rozdělí na dvě poloviny, mezi něž se vloží dva bajty s hodnotou \texttt{fffe}, a v prvním bajtu se invertuje sedmý bit rozlišující univerzální a lokální správu. Fyzická adresa \texttt{00:e0:4c:68:02:16} tak vede na identifikátor \texttt{02e0:4cff:fe68:0216}. Tento postup je pro navržené zařízení prakticky významný: adresa protistrany z něj vychází deterministicky, a lze ji tedy dopočítat namísto toho, aby byla zapsána napevno do řídicí aplikace.
+
+O zjišťování sousedů na společné lince se v protokolu IPv6 stará mechanismus Neighbor Discovery \cite{rfc4861}, který nahrazuje protokol ARP známý z protokolu IPv4 a je postaven nad protokolem ICMPv6. Zařízení si jeho prostřednictvím zjišťují vzájemné fyzické adresy, ověřují dosažitelnost sousedů a nacházejí směrovače v segmentu. Pro popisované zařízení jsou klíčové dvě z jeho zpráv. Zprávou Router Solicitation zasílanou na skupinovou adresu všech směrovačů se stanice po zdvižení rozhraní dotazuje, zda je v segmentu přítomen směrovač. Odpovědí je zpráva Router Advertisement, kterou směrovač inzeruje sám sebe a spolu s tím i prefixy platné v daném segmentu. Součástí mechanismu je rovněž detekce duplicitních adres, kterou stanice ověřuje, že jí zvolená adresa není v segmentu již obsazena.
+
+Na zprávě Router Advertisement je postavena bezstavová automatická konfigurace adres \cite{rfc4862}. Stanice si z inzerovaného prefixu a z vlastního identifikátoru rozhraní sestaví úplnou adresu sama, bez jakéhokoli serveru, který by o přidělení vedl evidenci. Zda a jak tuto možnost využije, řídí trojice příznaků nesených ve zprávě, jejichž význam shrnuje Tabulka \ref{tab:priznaky}.
+
+\begin{table}[htbp]
+    \caption{Význam příznaků nesených ve zprávě Router Advertisement}
+    \label{tab:priznaky}
+    \centering
+    \begin{tabular}{clp{7.5cm}}
+        \hline
+        Příznak & Název & Význam pro cílovou stanici \\
+        \hline
+        M & Managed address configuration & Adresu si stanice vyžádá od serveru DHCPv6 \\
+        O & Other configuration & Ostatní údaje, například adresy serverů DNS, získá od serveru DHCPv6 \\
+        A & Autonomous address configuration & Z tohoto konkrétního prefixu si stanice smí sestavit adresu sama \\
+        \hline
+    \end{tabular}
+\end{table}
+
+Zásadní je, že příznaky M a O se vztahují k celé zprávě, kdežto příznak A je nesen u každého inzerovaného prefixu zvlášť. Směrovač tedy může v jediné zprávě inzerovat několik prefixů a u každého z nich zvlášť rozhodnout, zda z něj stanice smí odvodit adresu vlastními silami. Obě cesty se přitom nevylučují a v praxi se běžně kombinují, takže jedna stanice může mít současně adresu sestavenou bezstavově a adresu přidělenou serverem.
+
+Stavovou alternativou je protokol DHCPv6 \cite{rfc8415}, který přebírá roli známou z protokolu IPv4: server vede evidenci přidělených adres, váže je na identifikátor klienta a spravuje dobu jejich zapůjčení. Za cenu této evidence poskytuje správci úplnou kontrolu nad tím, která stanice jakou adresu obdrží, a umožňuje předat i další konfigurační údaje.
+
+Rozdíl mezi oběma přístupy je pro přenosné testovací zařízení podstatný. Stanice s protokolem IPv4 bez běžícího klienta DHCP adresu nezíská nikdy, neboť jiný mechanismus protokol nenabízí. Naproti tomu jádro operačního systému s protokolem IPv6 přiděluje adresu lokální linky samočinně a při zdviženém příznaku A sestaví z inzerovaného prefixu i adresu širšího dosahu, aniž by na stanici musela běžet jakákoli služba pro konfiguraci sítě. Analyzátor schopný správně inzerovat prefix tak dokáže navázat spojení i s protistranou, na níž není nic nastaveno a nad níž nemá obsluha přístroje žádnou kontrolu. Ověření tohoto předpokladu na sestaveném prototypu je popsáno v podkapitole \ref{sec:overeni_autokonfigurace}.
+
 \section{Monitorování, generování a bezpečnostní audit síťového provozu}
 \label{sec:monitorovani}
 
