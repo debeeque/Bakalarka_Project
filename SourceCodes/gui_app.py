@@ -11,9 +11,11 @@ if os.path.exists(BASE_DIR):
     os.chdir(BASE_DIR)
 
 class AnalyzerApp:
-    RA_PORTS = {
-        "MONITOR": ("analyzer_monitor", "eth1"),
-        "SENDER": ("analyzer_sender", "eth2"),
+    PORTS = {
+        "MONITOR": {"ns": "analyzer_monitor", "iface": "eth1", "net4": "10.0.1.0/24",
+                    "v4": "10.0.1.20", "v6": "fd00:1::20"},
+        "SENDER": {"ns": "analyzer_sender", "iface": "eth2", "net4": "10.0.2.0/24",
+                   "v4": "10.0.2.20", "v6": "fd00:2::20"},
     }
 
     def __init__(self, root):
@@ -25,6 +27,7 @@ class AnalyzerApp:
         self.is_monitoring = False
         self.sniff_process = None
         self.test_running = False
+        self.found = {}
 
         self.setup_ui()
 
@@ -64,16 +67,17 @@ class AnalyzerApp:
         # Custom Numpad trigger
         tk.Button(sec_frame, text="NUMPAD", bg="#009688", fg="white", font=('Arial', 9, 'bold'), command=self.toggle_numpad).pack(side=tk.RIGHT, padx=5)
 
-        # --- IPv6 Audit Section ---
-        ra_frame = tk.LabelFrame(self.root, text=" IPv6 Audit ", font=('Arial', 10, 'bold'), fg="darkgreen")
+        # --- IPv6 Audit and Target Discovery Section ---
+        ra_frame = tk.LabelFrame(self.root, text=" IPv6 Audit & Target Discovery ", font=('Arial', 10, 'bold'), fg="darkgreen")
         ra_frame.pack(fill=tk.X, padx=10, pady=2)
 
         tk.Label(ra_frame, text="Port:", font=('Arial', 10)).pack(side=tk.LEFT, padx=5)
-        self.ra_port = tk.StringVar(value="MONITOR")
+        self.ra_port = tk.StringVar(value="SENDER")
         tk.Radiobutton(ra_frame, text="Monitor eth1", variable=self.ra_port, value="MONITOR", font=('Arial', 9)).pack(side=tk.LEFT, padx=2)
         tk.Radiobutton(ra_frame, text="Sender eth2", variable=self.ra_port, value="SENDER", font=('Arial', 9)).pack(side=tk.LEFT, padx=2)
 
         tk.Button(ra_frame, text="RA SCAN", bg="#00695C", fg="white", font=('Arial', 9, 'bold'), command=self.run_ra_audit, width=10).pack(side=tk.LEFT, padx=5)
+        tk.Button(ra_frame, text="NEIGHBORS", bg="#0277BD", fg="white", font=('Arial', 9, 'bold'), command=self.run_neigh_scan, width=11).pack(side=tk.LEFT, padx=2)
 
         # --- Dashboard Section ---
         self.res_frame = tk.LabelFrame(self.root, text=" Intelligence Dashboard ", font=('Arial', 10, 'bold'), fg="darkblue")
@@ -89,7 +93,14 @@ class AnalyzerApp:
         self.log_area = scrolledtext.ScrolledText(self.root, width=90, height=8, font=('Consolas', 9))
         self.log_area.pack(padx=10, pady=5, fill=tk.BOTH, expand=True)
 
+    # Tk widgets must only be touched from the main thread
+    def ui(self, fn, *args, **kwargs):
+        self.root.after(0, lambda: fn(*args, **kwargs))
+
     def log(self, text):
+        self.ui(self._append_log, text)
+
+    def _append_log(self, text):
         self.log_area.insert(tk.END, f"{text}\n")
         self.log_area.see(tk.END)
 
@@ -149,17 +160,67 @@ class AnalyzerApp:
 
     def device_macs(self):
         macs = []
-        for ns, iface in self.RA_PORTS.values():
-            cmd = ["sudo", "ip", "netns", "exec", ns, "cat", "/sys/class/net/%s/address" % iface]
+        for cfg in self.PORTS.values():
+            cmd = ["sudo", "ip", "netns", "exec", cfg["ns"], "cat", "/sys/class/net/%s/address" % cfg["iface"]]
             res = subprocess.run(cmd, capture_output=True, text=True)
             mac = res.stdout.strip()
             if mac:
                 macs.append(mac)
         return ",".join(macs)
 
+    def port_cfg(self):
+        return self.PORTS[self.ra_port.get()]
+
+    def target_for(self, cfg, family):
+        found = self.found.get(cfg["ns"], {}).get(family)
+        if found:
+            return found, "discovered"
+        return cfg[family], "hardcoded fallback"
+
+    def run_neigh_scan(self):
+        if self.test_running: return
+        cfg = self.port_cfg()
+        self.test_running = True
+        self.log(f"Discovery: enumerating IPv6 neighbours on {cfg['iface']} ({cfg['ns']})...")
+
+        def task():
+            base = ["sudo", "ip", "netns", "exec", cfg["ns"]]
+            cmd = base + ["python3", "neigh_scan.py", cfg["iface"]]
+            own = self.device_macs()
+            if own:
+                cmd += ["--own", own]
+
+            res = subprocess.run(cmd, capture_output=True, text=True)
+            self.log("-" * 30)
+            self.log(res.stdout.strip() if res.stdout.strip() else "No output.")
+            if res.stderr.strip():
+                self.log(res.stderr.strip())
+
+            arp = subprocess.run(base + ["python3", "arp_scan.py", cfg["iface"], cfg["net4"]],
+                                 capture_output=True, text=True)
+            self.log(arp.stdout.strip() if arp.stdout.strip() else "No ARP output.")
+            self.log("-" * 30)
+
+            store = self.found.setdefault(cfg["ns"], {})
+            m6 = re.search(r"^TARGET6\s+:\s+(\S+)", res.stdout, re.M)
+            if m6 and m6.group(1) != "none":
+                store["v6"] = m6.group(1)
+            m4 = re.search(r"^TARGET4:\s+(\S+)", arp.stdout, re.M)
+            if m4 and m4.group(1) != "none":
+                store["v4"] = m4.group(1)
+                self.ui(self.ip_entry.delete, 0, tk.END)
+                self.ui(self.ip_entry.insert, 0, store["v4"])
+
+            self.log(f"Discovery: targets for {cfg['ns']} -> "
+                     f"v4 {store.get('v4', 'none')}, v6 {store.get('v6', 'none')}")
+            self.test_running = False
+
+        threading.Thread(target=task, daemon=True).start()
+
     def run_ra_audit(self):
         if self.test_running: return
-        ns, iface = self.RA_PORTS[self.ra_port.get()]
+        cfg = self.port_cfg()
+        ns, iface = cfg["ns"], cfg["iface"]
         self.test_running = True
         self.lbl_ra.config(text="RA routers: ...", fg="orange")
         self.log(f"Audit: soliciting Router Advertisement on {iface} ({ns})...")
@@ -181,11 +242,11 @@ class AnalyzerApp:
             total = int(match.group(1)) if match else 0
             foreign = res.stdout.count("[FOREIGN]")
             if foreign:
-                self.lbl_ra.config(text=f"RA routers: {total} (foreign {foreign})", fg="red")
+                self.ui(self.lbl_ra.config, text=f"RA routers: {total} (foreign {foreign})", fg="red")
             elif total:
-                self.lbl_ra.config(text=f"RA routers: {total}", fg="green")
+                self.ui(self.lbl_ra.config, text=f"RA routers: {total}", fg="green")
             else:
-                self.lbl_ra.config(text="RA routers: none", fg="black")
+                self.ui(self.lbl_ra.config, text="RA routers: none", fg="black")
             self.test_running = False
 
         threading.Thread(target=task, daemon=True).start()
@@ -228,14 +289,14 @@ class AnalyzerApp:
         subprocess.run(["sudo", "./setup_network.sh"])
         self.log("[OK] Netns and DHCP servers are ready.")
 
-    def execute_iperf(self, target, proto_name):
+    def execute_iperf(self, target, proto_name, ns=None):
         if self.test_running: return
         self.log(f"Test: Running throughput test to {target} ({proto_name})...")
         self.lbl_speed.config(text="Testing...", fg="orange")
         self.test_running = True
 
         def task():
-            cmd = ["sudo", "ip", "netns", "exec", self.netns_for(target), "iperf3", "-c", target, "-t", "5"]
+            cmd = ["sudo", "ip", "netns", "exec", ns or self.netns_for(target), "iperf3", "-c", target, "-t", "5"]
             res = subprocess.run(cmd, capture_output=True, text=True)
             
             if "error" in res.stderr or "error" in res.stdout:
@@ -246,21 +307,27 @@ class AnalyzerApp:
 
             if match:
                 mbps = match[-1]
-                self.lbl_speed.config(text=f"Speed: {mbps} Mbps", fg="green")
+                self.ui(self.lbl_speed.config, text=f"Speed: {mbps} Mbps", fg="green")
                 self.log(f"[SUCCESS] {proto_name} Bandwidth: {mbps} Mbps")
             else:
-                self.lbl_speed.config(text="Fail", fg="red")
+                self.ui(self.lbl_speed.config, text="Fail", fg="red")
             self.test_running = False
 
         threading.Thread(target=task, daemon=True).start()
 
     def run_iperf_v4(self):
-        self.execute_iperf("10.0.2.20", "IPv4")
+        cfg = self.port_cfg()
+        target, source = self.target_for(cfg, "v4")
+        self.log(f"Target: {target} ({source})")
+        self.execute_iperf(target, "IPv4", ns=cfg["ns"])
 
     def run_iperf_v6(self):
-        self.execute_iperf("fd00:2::20", "IPv6")
+        cfg = self.port_cfg()
+        target, source = self.target_for(cfg, "v6")
+        self.log(f"Target: {target} ({source})")
+        self.execute_iperf(target, "IPv6", ns=cfg["ns"])
 
-    def execute_ping(self, target, is_ipv6=False):
+    def execute_ping(self, target, is_ipv6=False, ns=None):
         if self.test_running: return
         proto = "IPv6" if is_ipv6 else "IPv4"
         self.log(f"Test: Measuring {proto} latency to {target}...")
@@ -268,7 +335,7 @@ class AnalyzerApp:
 
         def task():
             ping_cmd = "ping" if not is_ipv6 else "ping6"
-            cmd = ["sudo", "ip", "netns", "exec", self.netns_for(target), ping_cmd, target, "-c", "4"]
+            cmd = ["sudo", "ip", "netns", "exec", ns or self.netns_for(target), ping_cmd, target, "-c", "4"]
             res = subprocess.run(cmd, capture_output=True, text=True)
             self.log("-" * 20)
             self.log(res.stdout)
@@ -282,14 +349,21 @@ class AnalyzerApp:
         threading.Thread(target=task, daemon=True).start()
 
     def run_ping_v4(self):
-        self.execute_ping("10.0.2.20", is_ipv6=False)
+        cfg = self.port_cfg()
+        target, source = self.target_for(cfg, "v4")
+        self.log(f"Target: {target} ({source})")
+        self.execute_ping(target, is_ipv6=False, ns=cfg["ns"])
 
     def run_ping_v6(self):
-        self.execute_ping("fd00:2::20", is_ipv6=True)
+        cfg = self.port_cfg()
+        target, source = self.target_for(cfg, "v6")
+        self.log(f"Target: {target} ({source})")
+        self.execute_ping(target, is_ipv6=True, ns=cfg["ns"])
 
     def run_arp_scan(self):
-        self.log("Scan: Scanning 10.0.2.x subnet...")
-        cmd = ["sudo", "ip", "netns", "exec", "analyzer_sender", "python3", "arp_scan.py"]
+        cfg = self.port_cfg()
+        self.log(f"Scan: ARP sweep of {cfg['net4']} on {cfg['iface']} ({cfg['ns']})...")
+        cmd = ["sudo", "ip", "netns", "exec", cfg["ns"], "python3", "arp_scan.py", cfg["iface"], cfg["net4"]]
         res = subprocess.run(cmd, capture_output=True, text=True)
         self.log(res.stdout)
 
