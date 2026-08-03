@@ -11,6 +11,11 @@ if os.path.exists(BASE_DIR):
     os.chdir(BASE_DIR)
 
 class AnalyzerApp:
+    RA_PORTS = {
+        "MONITOR": ("analyzer_monitor", "eth1"),
+        "SENDER": ("analyzer_sender", "eth2"),
+    }
+
     def __init__(self, root):
         self.root = root
         self.root.title("Portable Network Analyzer")
@@ -59,6 +64,17 @@ class AnalyzerApp:
         # Custom Numpad trigger
         tk.Button(sec_frame, text="NUMPAD", bg="#009688", fg="white", font=('Arial', 9, 'bold'), command=self.toggle_numpad).pack(side=tk.RIGHT, padx=5)
 
+        # --- IPv6 Audit Section ---
+        ra_frame = tk.LabelFrame(self.root, text=" IPv6 Audit ", font=('Arial', 10, 'bold'), fg="darkgreen")
+        ra_frame.pack(fill=tk.X, padx=10, pady=2)
+
+        tk.Label(ra_frame, text="Port:", font=('Arial', 10)).pack(side=tk.LEFT, padx=5)
+        self.ra_port = tk.StringVar(value="MONITOR")
+        tk.Radiobutton(ra_frame, text="Monitor eth1", variable=self.ra_port, value="MONITOR", font=('Arial', 9)).pack(side=tk.LEFT, padx=2)
+        tk.Radiobutton(ra_frame, text="Sender eth2", variable=self.ra_port, value="SENDER", font=('Arial', 9)).pack(side=tk.LEFT, padx=2)
+
+        tk.Button(ra_frame, text="RA SCAN", bg="#00695C", fg="white", font=('Arial', 9, 'bold'), command=self.run_ra_audit, width=10).pack(side=tk.LEFT, padx=5)
+
         # --- Dashboard Section ---
         self.res_frame = tk.LabelFrame(self.root, text=" Intelligence Dashboard ", font=('Arial', 10, 'bold'), fg="darkblue")
         self.res_frame.pack(fill=tk.X, padx=10, pady=2)
@@ -67,6 +83,8 @@ class AnalyzerApp:
         self.lbl_speed.pack(side=tk.LEFT, padx=20)
         self.lbl_icmp = tk.Label(self.res_frame, text="Live ICMP/6: 0", font=('Arial', 12), fg="red")
         self.lbl_icmp.pack(side=tk.LEFT, padx=20)
+        self.lbl_ra = tk.Label(self.res_frame, text="RA routers: --", font=('Arial', 12))
+        self.lbl_ra.pack(side=tk.LEFT, padx=20)
 
         self.log_area = scrolledtext.ScrolledText(self.root, width=90, height=8, font=('Consolas', 9))
         self.log_area.pack(padx=10, pady=5, fill=tk.BOTH, expand=True)
@@ -128,6 +146,49 @@ class AnalyzerApp:
         if t.startswith("10.0.1.") or t.startswith("fd00:1:"):
             return "analyzer_monitor"
         return "analyzer_sender"
+
+    def device_macs(self):
+        macs = []
+        for ns, iface in self.RA_PORTS.values():
+            cmd = ["sudo", "ip", "netns", "exec", ns, "cat", "/sys/class/net/%s/address" % iface]
+            res = subprocess.run(cmd, capture_output=True, text=True)
+            mac = res.stdout.strip()
+            if mac:
+                macs.append(mac)
+        return ",".join(macs)
+
+    def run_ra_audit(self):
+        if self.test_running: return
+        ns, iface = self.RA_PORTS[self.ra_port.get()]
+        self.test_running = True
+        self.lbl_ra.config(text="RA routers: ...", fg="orange")
+        self.log(f"Audit: soliciting Router Advertisement on {iface} ({ns})...")
+
+        def task():
+            cmd = ["sudo", "ip", "netns", "exec", ns, "python3", "ra_audit.py", iface, "-t", "5"]
+            own = self.device_macs()
+            if own:
+                cmd += ["--own", own]
+
+            res = subprocess.run(cmd, capture_output=True, text=True)
+            self.log("-" * 30)
+            self.log(res.stdout.strip() if res.stdout.strip() else "No output.")
+            if res.stderr.strip():
+                self.log(res.stderr.strip())
+            self.log("-" * 30)
+
+            match = re.search(r"^Routers\s+:\s+(\d+)", res.stdout, re.M)
+            total = int(match.group(1)) if match else 0
+            foreign = res.stdout.count("[FOREIGN]")
+            if foreign:
+                self.lbl_ra.config(text=f"RA routers: {total} (foreign {foreign})", fg="red")
+            elif total:
+                self.lbl_ra.config(text=f"RA routers: {total}", fg="green")
+            else:
+                self.lbl_ra.config(text="RA routers: none", fg="black")
+            self.test_running = False
+
+        threading.Thread(target=task, daemon=True).start()
 
     def run_nmap(self):
         if self.test_running: return
