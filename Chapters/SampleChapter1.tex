@@ -19,13 +19,58 @@ První z nich slouží výhradně jako monitorovací rozhraní pro pasivní odpo
 
 Základním stavebním kamenem softwarové architektury je operační systém založený na jádře Linux. Jelikož analyzátor využívá dvě fyzická síťová rozhraní zapojená do stejného síťového segmentu, vyvstává problém s výchozím směrováním. Tento problém byl úspěšně vyřešen implementací technologie Linux Network Namespaces (netns). V rámci inicializačního skriptu jsou automaticky vytvořeny dva nezávislé jmenné prostory, do kterých jsou přesunuta fyzická rozhraní. Každý prostor disponuje vlastní směrovací tabulkou.
 
-Pro zajištění autonomie byl do izolovaných prostorů integrován DHCP server dnsmasq. Zásadním krokem při realizaci byla plná implementace a podpora protokolu IPv6. Po připojení k cílové stanici přidělí analyzátor automaticky nejen standardní IPv4 adresy, ale prostřednictvím odesílání zpráv Router Advertisement (RA) přidělí i unikátní lokální IPv6 adresy z rozsahu \texttt{fd00::/64}.
+Do obou jmenných prostorů byl dále integrován server dnsmasq. Každá jeho instance obsluhuje výhradně rozhraní vlastního prostoru a přiděluje cílové stanici adresu z odpovídajícího rozsahu, tedy \texttt{10.0.1.20} na straně monitorovacího portu a \texttt{10.0.2.20} na straně portu určeného ke generování provozu. Obsluha protokolu IPv6 je řešena souběžně, prostřednictvím zpráv Router Advertisement s unikátními lokálními prefixy \texttt{fd00:1::/64} a \texttt{fd00:2::/64}. Cílová stanice tak nevyžaduje žádnou předchozí ruční přípravu a k analyzátoru se připojí pouhým zasunutím kabelu. Způsob, jakým stanice adresu získá, se však u obou protokolů zásadně liší; této otázce je věnována podkapitola \ref{sec:autokonfigurace}.
 
-Uživatelské rozhraní je naprogramováno v jazyce Python s využitím knihovny Tkinter. Aplikace plní roli centrálního řídicího panelu. Za účelem maximalizace uživatelského komfortu při ovládání přes dotykový displej byla do aplikace naprogramována vlastní virtuální číselná klávesnice (Numpad). Tím zcela odpadá nutnost připojovat k analyzátoru externí hardwarovou klávesnici při zadávání IP adres.
+Uživatelské rozhraní je naprogramováno v jazyce Python s využitím knihovny Tkinter. Aplikace plní roli centrálního řídicího panelu (viz Obrázek \ref{fig:gui}) a je rozvržena pro rozlišení displeje 800 na 480 obrazových bodů. Za účelem maximalizace uživatelského komfortu při ovládání přes dotykový displej byla do aplikace naprogramována vlastní virtuální číselná klávesnice (Numpad). Tím zcela odpadá nutnost připojovat k analyzátoru externí hardwarovou klávesnici při zadávání IP adres.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{Figures/gui.JPG}
+    \caption{Hlavní obrazovka aplikace Portable Network Analyzer}
+    \label{fig:gui}
+\end{figure}
+
+Inicializace celého síťového prostředí je spouštěna přímo z aplikace jediným tlačítkem, které vyvolá skript uvedený v Příloze \ref{sec:Appendix1}. Průběh inicializace je uživateli vypisován do textového pole, takže lze bezprostředně ověřit, že oba jmenné prostory vznikly, rozhraní do nich byla přesunuta a obě instance serveru dnsmasq běží (viz Obrázek \ref{fig:setup_net}).
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{Figures/gui_setup_net.JPG}
+    \caption{Výstup inicializačního skriptu při vytváření jmenných prostorů}
+    \label{fig:setup_net}
+\end{figure}
 
 Klíčovým rozšířením softwarové části je integrace bezpečnostního skeneru Nmap pro aktivní síťový průzkum (Network Reconnaissance). Uživatelské rozhraní umožňuje spouštět audity ve dvou režimech: kabelové skenování (LAN) zevnitř izolovaného prostoru a bezdrátové skenování přes integrovaný Wi-Fi modul s funkcí automatické detekce IP adresy výchozí brány.
 
 Pro pasivní odposlech je využíván nástroj tcpdump, pro mapování topologie knihovna Scapy a aktivní zátěžové testy jsou realizovány nástrojem iperf3, odděleně pro protokoly IPv4 a IPv6.
+
+\subsection{Adresní autokonfigurace protokolu IPv6}
+\label{sec:autokonfigurace}
+
+Požadavek na plnou podporu protokolu IPv6 se při realizaci ukázal jako nejnáročnější část celé konfigurace, a to nikoli kvůli objemu práce, nýbrž kvůli odlišné povaze obou protokolů. Zatímco stanice s protokolem IPv4 nemá bez běžícího klienta DHCP jak adresu získat, protokol IPv6 nabízí vedle stavového serveru DHCPv6 také bezstavovou autokonfiguraci, při níž si stanice sestaví adresu sama z prefixu inzerovaného směrovačem ve zprávě Router Advertisement. Kterou z obou cest stanice zvolí, určuje samotná zpráva: příznak M (Managed address configuration) ji odkazuje na server DHCPv6, zatímco příznak A (Autonomous address configuration), nesený u každého inzerovaného prefixu zvlášť, teprve povoluje sestavení adresy z tohoto prefixu \cite{nastase2024}.
+
+V první realizaci byl rozsah adres zapsán jako jediná konkrétní adresa, tedy \texttt{-{}-dhcp-range=fd00:1::20,fd00:1::20,64,12h}. Toto zdánlivě neškodné zúžení rozsahu vedlo k tomu, že server dnsmasq nastavil příznaky ve zprávě Router Advertisement způsobem uvedeným v Tabulce \ref{tab:ra_flags}. Hodnoty byly odečteny přímo na cílové stanici nástrojem \texttt{rdisc6}, který zprávu vyžádá zasláním Router Solicitation a vypíše její obsah v čitelné podobě.
+
+\begin{table}[htbp]
+    \caption{Příznaky ve zprávě Router Advertisement před úpravou a po ní}
+    \label{tab:ra_flags}
+    \centering
+    \begin{tabular}{lcc}
+        \hline
+        Příznak & Původní konfigurace & Po doplnění \texttt{slaac} \\
+        \hline
+        M -- Stateful address configuration & Yes & Yes \\
+        O -- Stateful other configuration & Yes & Yes \\
+        A -- Autonomous address configuration & No & Yes \\
+        On-link & Yes & Yes \\
+        \hline
+    \end{tabular}
+\end{table}
+
+Autokonfiguraci tedy bránily dvě okolnosti současně, nikoli jedna. Nastavený příznak M odkazoval cílovou stanici na server DHCPv6 a zároveň zhasnutý příznak A u inzerovaného prefixu zakazoval sestavit z tohoto prefixu adresu vlastními silami. Server dnsmasq nastavuje obojí právě tímto způsobem ve chvíli, kdy je rozsah zadán konkrétní adresou, neboť takový zápis chápe jako pokyn k výhradně stavovému přidělování. Řešením se ukázalo doplnění klíčového slova \texttt{slaac} do téhož parametru, tedy \texttt{-{}-dhcp-range=fd00:1::20,fd00:1::20,slaac,64,12h}. Po této jediné úpravě začal analyzátor inzerovat prefix se zdviženým příznakem A, aniž by přestal obsluhovat stavové požadavky.
+
+Účinek úpravy byl ověřen okamžitě. Jádro cílové stanice sestavilo z inzerovaného prefixu adresu \texttt{fd00:1::2e0:4cff:fe68:216} označenou v systémovém výpisu příznakem \texttt{proto kernel\_ra}, tedy adresu vytvořenou přímo jádrem na základě přijaté zprávy, bez účasti jakéhokoli procesu v uživatelském prostoru. Identifikátor rozhraní v její druhé polovině odpovídá fyzické adrese cílového rozhraní \texttt{00:e0:4c:68:02:16} převedené postupem EUI-64. Adresa protistrany je tak z její fyzické adresy vypočitatelná, což otevírá cestu k odstranění napevno zapsaných adres z řídicí aplikace.
+
+Z uvedeného pozorování plyne závěr, který je pro hodnocení celého zařízení podstatnější než samotná oprava konfigurace. Rozdíl mezi oběma protokoly nespočívá v množství ruční práce na straně obsluhy, neboť moderní správci síťových připojení si profil vytvoří samočinně u obou protokolů. Rozdíl spočívá v tom, zda je na cílové stanici vůbec zapotřebí nějaký proces: u protokolu IPv4 bez klienta DHCP adresa nevznikne nikdy, kdežto u protokolu IPv6 přiděluje jádro adresu lokální linky ihned po zdvižení rozhraní a při zdviženém příznaku A z inzerovaného prefixu sestaví i adresu globálního dosahu. Přenosný analyzátor tak dokáže oslovit protistranu i tehdy, kdy na ní neběží žádná služba pro konfiguraci sítě.
 
 \section{Zhodnocení dosažených výsledků}
 \label{sec:zhodnoceni}
@@ -39,7 +84,59 @@ Funkčnost navrženého řešení byla ověřena v laboratoři počítačových 
     \label{fig:zapojeni}
 \end{figure}
 
-Následně byly provedeny testy dostupnosti (ICMP Echo Request pro IPv4 a ICMPv6 pro IPv6), které potvrdily stabilní spojení s nulovou ztrátovostí paketů. Nejvýznamnější částí testování bylo ověření maximální propustnosti sítě pomocí zátěžového generátoru iperf3.
+\subsection{Ověření automatické konfigurace adres}
+\label{sec:overeni_autokonfigurace}
+
+Chování adresní autokonfigurace popsané v podkapitole \ref{sec:autokonfigurace} bylo ověřeno samostatným měřením, při němž byl analyzátor propojen s cílovou stanicí oběma testovacími porty současně. Uspořádání měření umožnilo porovnat obě konfigurace na jediném zařízení a ve stejném okamžiku: monitorovací port byl restartován s doplněným klíčovým slovem \texttt{slaac}, zatímco port pro generování provozu byl ponechán v původním nastavení jako kontrolní vzorek. Výsledné adresy přidělené oběma rozhraním cílové stanice shrnuje Tabulka \ref{tab:adresy}.
+
+\begin{table}[htbp]
+    \caption{Adresy přidělené cílové stanici na obou testovacích portech}
+    \label{tab:adresy}
+    \centering
+    \begin{tabular}{lll}
+        \hline
+        Port analyzátoru & Adresa cílové stanice & Způsob získání \\
+        \hline
+        monitorovací, A = 1 & \texttt{10.0.1.20} & DHCPv4 \\
+        monitorovací, A = 1 & \texttt{fd00:1::20/128} & stavově, DHCPv6 \\
+        monitorovací, A = 1 & \texttt{fd00:1::2e0:4cff:fe68:216/64} & bezstavově, jádrem ze zprávy RA \\
+        generující, A = 0 & \texttt{10.0.2.20} & DHCPv4 \\
+        generující, A = 0 & \texttt{fd00:2::20/128} & stavově, DHCPv6 \\
+        \hline
+    \end{tabular}
+\end{table}
+
+Rozdíl mezi oběma řádky s protokolem IPv6 je podstatou celého měření. Na monitorovacím portu vznikla vedle stavově přidělené adresy také adresa sestavená jádrem z inzerovaného prefixu, kdežto na kontrolním portu se zhasnutým příznakem A žádná taková adresa nevznikla, přestože obě rozhraní byla po celou dobu ve stavu \texttt{UP} a obsluhována týmž zařízením. Doplnění jediného klíčového slova do konfigurace serveru dnsmasq je tedy skutečnou a jedinou příčinou pozorované změny.
+
+Následně byly provedeny testy dostupnosti (ICMP Echo Request pro IPv4 a ICMPv6 pro IPv6), a to jak na adresy přidělené stavově, tak na adresu sestavenou bezstavově. Všechna měření potvrdila stabilní spojení s nulovou ztrátovostí paketů a dobou odezvy pohybující se okolo jedné milisekundy (viz Obrázky \ref{fig:pingv4} a \ref{fig:pingv6}).
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{Figures/gui_pingv4.JPG}
+    \caption{Test dostupnosti cílové stanice protokolem IPv4}
+    \label{fig:pingv4}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{Figures/gui_pingv6.JPG}
+    \caption{Test dostupnosti cílové stanice protokolem IPv6}
+    \label{fig:pingv6}
+\end{figure}
+
+Samostatně byla ověřena také funkce mapování topologie realizovaná knihovnou Scapy. Skenování protokolem ARP provedené uvnitř izolovaného jmenného prostoru nalezlo v testovaném segmentu právě jednu stanici a vypsalo její fyzickou adresu (viz Obrázek \ref{fig:arp_scan}), což odpovídá skutečnému zapojení laboratorního stanoviště.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{Figures/gui_arp_scan.JPG}
+    \caption{Výsledek skenování protokolem ARP v izolovaném jmenném prostoru}
+    \label{fig:arp_scan}
+\end{figure}
+
+\subsection{Měření propustnosti}
+\label{sec:mereni_propustnosti}
+
+Nejvýznamnější částí testování bylo ověření maximální propustnosti sítě pomocí zátěžového generátoru iperf3.
 
 \begin{figure}[htbp]
     \centering
@@ -57,7 +154,14 @@ Při testování propustnosti nad protokolem IPv4 dosáhla síť průměrné ryc
     \label{fig:speedv6}
 \end{figure}
 
-Kromě měření propustnosti byla otestována také nově integrovaná funkce bezpečnostního skeneru Nmap. Obrázek \ref{fig:nmap_lan} ilustruje výstup skenování cílové stanice přes izolované ethernetové rozhraní, kde analyzátor správně identifikoval otevřený port služby SSH a detekoval OS Ubuntu Linux. Skutečnost, že při záměrném pokusu o naskenování adresy z podsítě monitorovacího portu (\texttt{10.0.1.x}) nebyly přístrojem z logických důvodů nalezeny žádné cíle, empiricky potvrzuje bezchybné fungování a absolutní izolaci vnitřních prostorů Network Namespaces.
+\subsection{Skenování sítě a ověření izolace jmenných prostorů}
+\label{sec:skenovani}
+
+Kromě měření propustnosti byla otestována také nově integrovaná funkce bezpečnostního skeneru Nmap. Obrázek \ref{fig:nmap_lan} ilustruje výstup skenování cílové stanice přes izolované ethernetové rozhraní, kde analyzátor správně identifikoval otevřený port služby SSH a detekoval operační systém protistrany.
+
+Právě toto testování odhalilo omezení první verze řídicí aplikace. Skener byl v režimu kabelového skenování spouštěn napevno ve jmenném prostoru \texttt{analyzer\_sender}, takže pokus o sken adresy \texttt{10.0.1.20}, jež náleží podsíti monitorovacího portu, skončil hlášením \texttt{failed to determine route} a žádný cíl nebyl prozkoumán. Táž adresa přitom byla ze jmenného prostoru \texttt{analyzer\_monitor} dostupná bez potíží. Chování tedy nebylo poruchou sítě ani cílové stanice, nýbrž důsledkem toho, že mezi oběma jmennými prostory záměrně neexistuje směrovací cesta.
+
+Z hlediska ověření návrhu je tento výsledek cenný, neboť dokládá, že izolace obou prostředí je skutečná a nikoli pouze deklarovaná: provoz z jednoho prostoru se do druhého nedostane ani tehdy, je-li o to výslovně požádáno. Z hlediska použitelnosti nástroje šlo ovšem o vadu, protože část adresního rozsahu zůstávala z rozhraní nedosažitelná. Aplikace byla proto doplněna o metodu \texttt{netns\_for()}, která podle podsítě zadaného cíle vybere odpovídající jmenný prostor a teprve v něm příslušný nástroj spustí. Stejný mechanismus se nyní uplatňuje i u testů dostupnosti a u zátěžových testů nástrojem iperf3. Po této úpravě proběhne skenování adres z obou podsítí bez chyby, aniž by byla izolace jakkoli narušena.
 
 \begin{figure}[htbp]
     \centering

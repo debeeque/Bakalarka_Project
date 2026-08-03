@@ -21,5 +21,11 @@
 BachelorThesis.pdf
 *.zip
 
-# IDE settings
-.vscode/
+# Генерируется пакетом pdfx при каждой сборке — в репозитории не нужен
+pdfa.xmpi
+
+# IDE settings: сами настройки сборки держим в репозитории,
+# чтобы latexmk-рецепт был одинаковый на Acer и на Huawei.
+# Остальное содержимое .vscode/ (кэши, история) — мимо.
+.vscode/*
+!.vscode/settings.json
