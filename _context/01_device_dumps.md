@@ -3950,3 +3950,165 @@ MAC Address: 00:E0:4C:68:02:16 (Realtek Semiconductor)
 сканер в `analyzer_sender`, тогда как `10.0.1.20` находится за
 `analyzer_monitor`, а namespace изолированы намеренно и маршрута между ними нет.
 Исправлено методом `netns_for()` — выбор namespace по подсети цели.
+
+---
+
+# Аудит IPv6, часть 1: анализатор Router Advertisement (03.08.2026)
+
+Топология эксперимента: один кабель напрямую между двумя USB-LAN адаптерами
+прибора, `eth1 ↔ eth2`. Huawei в опыте не участвует. Оба линка 1000Mb/s,
+full duplex. На каждом порту свой dnsmasq с `--enable-ra`, порты разведены по
+namespace `analyzer_monitor` (eth1, `fd00:1::/64`) и `analyzer_sender`
+(eth2, `fd00:2::/64`).
+
+MAC портов: `eth1 = 00:e0:4c:68:02:64`, `eth2 = 00:e0:4c:68:02:23`.
+
+## Sender слушает Monitor
+
+```
+# ip netns exec analyzer_sender python3 ra_audit.py eth2 -t 5 \
+      --own 00:e0:4c:68:02:64,00:e0:4c:68:02:23
+
+=== IPv6 Router Advertisement audit ===
+Interface    : eth2 (00:e0:4c:68:02:23)
+Link-local   : fe80::2e0:4cff:fe68:223
+Own MACs     : 00:e0:4c:68:02:23, 00:e0:4c:68:02:64
+Solicitation : sent to ff02::2 from fe80::2e0:4cff:fe68:223
+Routers      : 1
+
+--- Router 1 [OWN DEVICE] ---
+Source       : fe80::2e0:4cff:fe68:264
+Source MAC   : 00:e0:4c:68:02:64
+RA received  : 1
+Cur hop limit: 64
+Flags        : M=1 O=1   preference=Medium
+Router life  : 1800 s
+Reachable    : 0 ms   Retrans: 0 ms
+Prefix       : fd00:1::/64   L=1 A=1 R=0
+               valid 43200 s, preferred 43200 s
+MTU          : 1500
+Src LL addr  : 00:e0:4c:68:02:64
+RDNSS        : fe80::2e0:4cff:fe68:264   lifetime 43200 s
+Audit:
+  [OK   ] another port of this device, received over the wire
+  [WARN ] M flag set together with A flag, mixed DHCPv6 and SLAAC
+
+--- Segment summary ---
+Sent by this port : 0
+Heard on the wire : 1, of them foreign 0
+```
+
+Обратная сторона симметрична: с `eth1` виден префикс `fd00:2::/64` от
+`00:e0:4c:68:02:23`, тот же вердикт.
+
+Ответ приходит сразу, ждать периодического RA не приходится: анализатор
+посылает Router Solicitation на `ff02::2`, как это делает `rdisc6`.
+
+## Переключение A-флага ключевым словом slaac
+
+Это эксперимент 02.08, выполненный самим прибором. Меняется только строка
+`dhcp-range` у dnsmasq на eth1, слушает eth2.
+
+Без слова `slaac`, то есть `--dhcp-range=fd00:1::20,fd00:1::20,64,12h`:
+
+```
+--- Router 1 [OWN DEVICE] ---
+Prefix       : fd00:1::/64   L=1 A=0 R=0
+               valid 43200 s, preferred 43200 s
+Audit:
+  [OK   ] another port of this device, received over the wire
+  [WARN ] fd00:1::/64: A flag clear, SLAAC disabled
+```
+
+Со словом `slaac`, то есть `--dhcp-range=fd00:1::20,fd00:1::20,slaac,64,12h`:
+
+```
+--- Router 1 [OWN DEVICE] ---
+Prefix       : fd00:1::/64   L=1 A=1 R=0
+               valid 43200 s, preferred 43200 s
+Audit:
+  [OK   ] another port of this device, received over the wire
+  [WARN ] M flag set together with A flag, mixed DHCPv6 and SLAAC
+```
+
+Видно и второе, менее очевидное: dnsmasq при `slaac` держит **M=1 и A=1
+одновременно**. То есть цели предлагаются сразу два источника адреса —
+DHCPv6 и SLAAC. Аудит это отмечает; это не дефект прибора, а точное описание
+поведения dnsmasq.
+
+## Стенд для проверки самого анализатора: veth-петля
+
+Чтобы не зависеть от кабелей, разбор проверялся на программной петле: два
+временных namespace `ra_test_a` / `ra_test_b`, соединённых veth-парой, dnsmasq
+с `--enable-ra` на одном конце. После проверок namespace удалены.
+
+Туда же инжектировался заведомо некорректный RA (Scapy, `hlim=64`, источник не
+link-local, префикс `/48` при `A=1`, `preferred > valid`, `MTU 1200`,
+подменённый Source Link-Layer Address). Сработали все проверки разом:
+
+```
+--- Router 2 [FOREIGN] ---
+Source       : fd00:9::99
+Source MAC   : de:ad:be:ef:00:01
+Cur hop limit: 0
+Flags        : M=1 O=0   preference=High
+Src LL addr  : 11:22:33:44:55:66
+Prefix       : 2001:db8::/48   L=1 A=1 R=0
+               valid 600 s, preferred 1200 s
+MTU          : 1200
+Audit:
+  [ALERT] router is not this device, possible rogue RA
+  [ALERT] hop limit 64, RFC 4861 requires 255
+  [WARN ] source fd00:9::99 is not link-local, RFC 4861
+  [ALERT] MTU 1200 below IPv6 minimum 1280
+  [ALERT] frame MAC de:ad:be:ef:00:01 differs from option 11:22:33:44:55:66
+  [ALERT] 2001:db8::/48: A flag set but length is not 64, RFC 4862
+  [ALERT] 2001:db8::/48: preferred lifetime above valid, RFC 4861
+  [WARN ] M flag set together with A flag, mixed DHCPv6 and SLAAC
+
+--- Segment summary ---
+  [WARN ] more than one router advertises on veth_b
+  [ALERT] unknown router fd00:9::99 at de:ad:be:ef:00:01
+```
+
+## Почему у RA три происхождения, а не два
+
+Изначально предполагалось делить RA на свои и чужие по source MAC. Оказалось,
+что этого мало: Scapy через `AF_PACKET` захватывает и **исходящие** кадры, и
+прибор «обнаруживал маршрутизатор в сегменте», глядя на передачу собственного
+dnsmasq. Подтверждено направленным захватом:
+
+```
+# ip netns exec analyzer_sender tcpdump -i eth2 -Q out -n 'icmp6 && ip6[40] == 134'
+18:50:25.121134 IP6 fe80::2e0:4cff:fe68:223 > ff02::1: ICMP6, router advertisement, length 88
+1 packet captured
+
+# ip netns exec analyzer_sender tcpdump -i eth2 -Q in  -n 'icmp6 && ip6[40] == 134'
+0 packets captured
+```
+
+Поэтому введены три метки: `LOCAL TX` — кадр отправлен самим этим портом,
+`OWN DEVICE` — другой порт прибора, услышанный по проводу, `FOREIGN` — чужой
+маршрутизатор.
+
+Отсюда же ограничение: прибор не может опросить собственный RA на том порту,
+который его излучает. RS уходит сырым L2-сокетом мимо IP-стека, и dnsmasq в
+том же namespace его не слышит; через сокет ядра с scope-id
+(`IPv6(dst="ff02::2%eth2")`) dnsmasq тоже не ответил. Отсюда требование к
+топологии: RA обязан пройти по линку, то есть нужен кабель `eth1 ↔ eth2`.
+
+## Попутно найден баг в setup_network.sh
+
+Второй запуск скрипта подряд ломал стенд:
+
+```
+Cannot find device "eth2"
+dnsmasq: unknown interface eth2
+```
+
+При `ip netns delete` физические интерфейсы возвращаются в дефолтный namespace
+**асинхронно**, а скрипт сразу пытался их перекинуть обратно. eth1 успевал,
+eth2 не успевал и оставался в дефолтном namespace с пустым `analyzer_sender`.
+На свежей загрузке баг не проявлялся, потому что интерфейсы и так лежали в
+дефолтном namespace. Добавлено ожидание появления интерфейса перед переносом;
+три запуска подряд проходят чисто.

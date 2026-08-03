@@ -5,6 +5,19 @@ killall dnsmasq 2>/dev/null
 ip netns delete analyzer_monitor 2>/dev/null
 ip netns delete analyzer_sender 2>/dev/null
 
+# Deleting a namespace returns its physical interfaces asynchronously
+wait_for_iface() {
+    for _ in $(seq 1 50); do
+        [ -e "/sys/class/net/$1" ] && return 0
+        sleep 0.1
+    done
+    echo "Error: interface $1 did not return to the default namespace"
+    return 1
+}
+
+wait_for_iface eth1 || exit 1
+wait_for_iface eth2 || exit 1
+
 # Create new isolated network namespaces
 ip netns add analyzer_monitor
 ip netns add analyzer_sender
