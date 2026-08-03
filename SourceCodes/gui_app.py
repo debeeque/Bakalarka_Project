@@ -22,6 +22,8 @@ class AnalyzerApp:
         self.root = root
         self.root.title("Portable Network Analyzer")
         self.root.geometry("800x480")
+        # Kiosk mode: no title bar to hit on a resistive touchscreen
+        self.root.attributes('-fullscreen', True)
 
         self.stats = {"TCP": 0, "UDP": 0, "ICMP": 0}
         self.is_monitoring = False
@@ -56,16 +58,16 @@ class AnalyzerApp:
         self.ip_entry.insert(0, "10.0.2.20")
         self.ip_entry.pack(side=tk.LEFT, padx=5)
         
-        tk.Button(sec_frame, text="DET", bg="#FFC107", font=('Arial', 8, 'bold'), command=self.detect_gateway).pack(side=tk.LEFT, padx=2)
+        tk.Button(sec_frame, text="DET", bg="#FFC107", font=('Arial', 9, 'bold'), pady=8, command=self.detect_gateway).pack(side=tk.LEFT, padx=2)
 
         self.scan_mode = tk.StringVar(value="LAN")
-        tk.Radiobutton(sec_frame, text="LAN", variable=self.scan_mode, value="LAN", font=('Arial', 9)).pack(side=tk.LEFT, padx=2)
-        tk.Radiobutton(sec_frame, text="Wi-Fi", variable=self.scan_mode, value="WIFI", font=('Arial', 9)).pack(side=tk.LEFT, padx=2)
+        tk.Radiobutton(sec_frame, text="LAN", variable=self.scan_mode, value="LAN", font=('Arial', 9), pady=8).pack(side=tk.LEFT, padx=2)
+        tk.Radiobutton(sec_frame, text="Wi-Fi", variable=self.scan_mode, value="WIFI", font=('Arial', 9), pady=8).pack(side=tk.LEFT, padx=2)
 
-        tk.Button(sec_frame, text="SCAN", bg="#333333", fg="white", font=('Arial', 9, 'bold'), command=self.run_nmap, width=8).pack(side=tk.LEFT, padx=5)
+        tk.Button(sec_frame, text="SCAN", bg="#333333", fg="white", font=('Arial', 9, 'bold'), pady=8, command=self.run_nmap, width=8).pack(side=tk.LEFT, padx=5)
         
         # Custom Numpad trigger
-        tk.Button(sec_frame, text="NUMPAD", bg="#009688", fg="white", font=('Arial', 9, 'bold'), command=self.toggle_numpad).pack(side=tk.RIGHT, padx=5)
+        tk.Button(sec_frame, text="NUMPAD", bg="#009688", fg="white", font=('Arial', 9, 'bold'), pady=8, command=self.toggle_numpad).pack(side=tk.RIGHT, padx=5)
 
         # --- IPv6 Audit and Target Discovery Section ---
         ra_frame = tk.LabelFrame(self.root, text=" IPv6 Audit & Target Discovery ", font=('Arial', 10, 'bold'), fg="darkgreen")
@@ -73,11 +75,11 @@ class AnalyzerApp:
 
         tk.Label(ra_frame, text="Port:", font=('Arial', 10)).pack(side=tk.LEFT, padx=5)
         self.ra_port = tk.StringVar(value="SENDER")
-        tk.Radiobutton(ra_frame, text="Monitor eth1", variable=self.ra_port, value="MONITOR", font=('Arial', 9)).pack(side=tk.LEFT, padx=2)
-        tk.Radiobutton(ra_frame, text="Sender eth2", variable=self.ra_port, value="SENDER", font=('Arial', 9)).pack(side=tk.LEFT, padx=2)
+        tk.Radiobutton(ra_frame, text="Monitor eth1", variable=self.ra_port, value="MONITOR", font=('Arial', 9), pady=8).pack(side=tk.LEFT, padx=2)
+        tk.Radiobutton(ra_frame, text="Sender eth2", variable=self.ra_port, value="SENDER", font=('Arial', 9), pady=8).pack(side=tk.LEFT, padx=2)
 
-        tk.Button(ra_frame, text="RA SCAN", bg="#00695C", fg="white", font=('Arial', 9, 'bold'), command=self.run_ra_audit, width=10).pack(side=tk.LEFT, padx=5)
-        tk.Button(ra_frame, text="NEIGHBORS", bg="#0277BD", fg="white", font=('Arial', 9, 'bold'), command=self.run_neigh_scan, width=11).pack(side=tk.LEFT, padx=2)
+        tk.Button(ra_frame, text="RA SCAN", bg="#00695C", fg="white", font=('Arial', 9, 'bold'), pady=8, command=self.run_ra_audit, width=10).pack(side=tk.LEFT, padx=5)
+        tk.Button(ra_frame, text="NEIGHBORS", bg="#0277BD", fg="white", font=('Arial', 9, 'bold'), pady=8, command=self.run_neigh_scan, width=11).pack(side=tk.LEFT, padx=2)
 
         # --- Dashboard Section ---
         self.res_frame = tk.LabelFrame(self.root, text=" Intelligence Dashboard ", font=('Arial', 10, 'bold'), fg="darkblue")
