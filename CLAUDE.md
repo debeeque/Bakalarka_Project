@@ -150,7 +150,12 @@ Crossref API, DOI подтверждены):
     Multiple Honeypot and Packet Analyzer Using Raspberry Pi 4 for Home Network*.
     QIR 2021, s. 43–48. doi:10.1109/qir54354.2021.9716189
 
-> Проверено скриптом: все 13 ключей `literature.bib` процитированы в тексте,
+14. RASPBERRY PI LTD. *Raspberry Pi 3 Model B+ Product Brief*, 2025.
+    → **важно:** гигабитный Ethernet висит на USB 2.0, официальный потолок
+    **300 Мбит/с**. Отсюда 276 и 274 Мбит/с — это предел платформы, а не сети.
+    Внесено и в практику, и в Závěr как честное ограничение прибора.
+
+> Проверено скриптом: все 14 ключей `literature.bib` процитированы в тексте,
 > висячих записей нет. Требование факультета «в Literatura только то, на что
 > есть ссылки» выполнено.
 
@@ -227,17 +232,22 @@ analyzátoru provozu*, *Zhodnocení dosažených výsledků*.
 
   | Глава | Слов | Было 30.03 |
   |---|---|---|
-  | `Introduction.tex` — Úvod | 236 | 236 |
-  | `SampleChapter2.tex` — Teoretická východiska a analýza problematiky | 1 692 | 384 |
-  | `SampleChapter1.tex` — Návrh a realizace, zhodnocení výsledků | 1 903 | 796 |
-  | `Conclusion.tex` — Závěr | 531 | 259 |
-  | **Итого** | **~4 359** | ~1 675 |
+  | `Introduction.tex` — Úvod | 403 | 236 |
+  | `SampleChapter2.tex` — Teoretická východiska a analýza problematiky | 2 656 | 384 |
+  | `SampleChapter1.tex` — Návrh a realizace, zhodnocení výsledků | 2 344 | 796 |
+  | `Conclusion.tex` — Závěr | ~600 | 259 |
+  | **Итого** | **~6 000** | ~1 675 |
 
-  25 страниц — это примерно **6 000–7 000 слов**. Написано около 65–70%.
-  Теория закрыта структурно: 2.1 протоколы, 2.2 адресация и автоконфигурация
-  IPv6, 2.3 мониторинг и аудит, 2.4 netns, 2.5 *analýza problematiky*
-  (три подхода, обзор работ по Raspberry Pi, четыре требования к прибору).
-  Тонкие места теперь 2.1 и 2.3 — их не трогали с марта.
+  25 страниц — это примерно 6 000–7 000 слов, то есть **объём набран**.
+  Теория закрыта целиком: 2.1 протоколы (заголовки, фрагментация, PMTUD,
+  влияние на измерения), 2.2 адресация и автоконфигурация IPv6, 2.3 мониторинг
+  и аудит (libpcap/BPF, TCP против UDP, ступени Nmap, правовой аспект),
+  2.4 netns (что изолируется, veth, сравнение с альтернативами),
+  2.5 *analýza problematiky*. Úvod переписан — там была ошибка про «пять глав»,
+  хотя глав четыре.
+
+  **Дальше проверять не количество слов, а реальные страницы** от Úvod до
+  Závěr в собранном PDF: `latexmk -pdf` и посмотреть нумерацию.
 - `Chapters/TechnicalDetails.tex` — остаток шаблона, в `BachelorThesis.tex` не
   подключён. Либо наполнить, либо удалить.
 - `Prilohy` (`Chapters/Appendix1.tex`, `Appendix2.tex`) не наполнены; коды лежат

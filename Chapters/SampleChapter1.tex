@@ -6,7 +6,9 @@ Tato kapitola detailně popisuje praktickou část bakalářské práce. Text je
 \section{Návrh přenosného zařízení}
 \label{sec:navrh_zarizeni}
 
-Pro zajištění dostatečného výpočetního výkonu a kompatibility se síťovými nástroji byl jako hlavní výpočetní jednotka zvolen jednodeskový počítač Raspberry Pi 3 Model B+. Tato platforma poskytuje nativní podporu pro operační systémy na bázi Linuxu, což je kritický požadavek pro pokročilou manipulaci se síťovými rozhraními a routováním.
+Pro zajištění dostatečného výpočetního výkonu a kompatibility se síťovými nástroji byl jako hlavní výpočetní jednotka zvolen jednodeskový počítač Raspberry Pi 3 Model B+. Deska je osazena čtyřjádrovým procesorem Cortex-A53 taktovaným na 1,4 GHz, disponuje operační pamětí o velikosti 1 GB, čtveřicí portů USB 2.0 a bezdrátovým rozhraním pracujícím v pásmech 2,4 GHz i 5 GHz \cite{rpi3bplus}. Tato platforma poskytuje nativní podporu pro operační systémy na bázi Linuxu, což je kritický požadavek pro pokročilou manipulaci se síťovými rozhraními a směrováním, a její pořizovací cena odpovídá záměru vytvořit dostupnou alternativu ke komerčním testerům.
+
+Volba platformy s sebou nese jedno omezení, které je nutné znát předem, neboť přímo ohraničuje vypovídací hodnotu měření propustnosti. Integrované ethernetové rozhraní je sice označováno jako gigabitové, je však k procesoru připojeno prostřednictvím sběrnice USB 2.0, a jeho výrobcem udávaná nejvyšší dosažitelná propustnost proto činí 300 Mbps \cite{rpi3bplus}. Totéž omezení platí i pro externí adaptéry popsané dále, které tutéž sběrnici navíc sdílejí. Zařízení tedy nemůže sloužit k ověření, zda linka skutečně přenese plnou gigabitovou rychlost; jeho úlohou je prokázat funkčnost spoje, změřit dosažitelnou propustnost v rámci možností platformy a poskytnout srovnání mezi protokoly za shodných podmínek.
 
 Aby zařízení splňovalo požadavek na přenositelnost a autonomii, je Raspberry Pi osazeno 5palcovým dotykovým displejem (HDMI LCD V2). Napájení displeje a přenos dat z dotykové vrstvy jsou realizovány prostřednictvím GPIO pinů, zatímco obrazový signál je přenášen standardním rozhraním HDMI. Díky tomuto řešení nevyžaduje analyzátor pro svůj provoz připojení externího monitoru, klávesnice ani myši.
 
@@ -42,6 +44,10 @@ Inicializace celého síťového prostředí je spouštěna přímo z aplikace j
 Klíčovým rozšířením softwarové části je integrace bezpečnostního skeneru Nmap pro aktivní síťový průzkum (Network Reconnaissance). Uživatelské rozhraní umožňuje spouštět audity ve dvou režimech: kabelové skenování (LAN) zevnitř izolovaného prostoru a bezdrátové skenování přes integrovaný Wi-Fi modul s funkcí automatické detekce IP adresy výchozí brány.
 
 Pro pasivní odposlech je využíván nástroj tcpdump, pro mapování topologie knihovna Scapy a aktivní zátěžové testy jsou realizovány nástrojem iperf3, odděleně pro protokoly IPv4 a IPv6.
+
+Pasivní monitorování je v aplikaci řešeno tak, aby výsledek byl použitelný okamžitě a bez následného rozboru zachyceného souboru. Odposlech běží v samostatném vlákně, takže uživatelské rozhraní zůstává po celou dobu ovladatelné, a zachycené pakety jsou průběžně tříděny podle protokolu. Obsluha tak na displeji sleduje narůstající počty rámců protokolů TCP, UDP a ICMP a zvlášť vyznačenou přítomnost provozu protokolu IPv6. Toto rozdělení bylo zvoleno záměrně: pro rychlou diagnostiku v terénu je podstatnější okamžitá odpověď na otázku, zda v segmentu vůbec něco komunikuje a jakého druhu provoz převažuje, než úplný výpis obsahu jednotlivých paketů. Zachycený provoz lze zároveň uložit do souboru ve formátu pcap a podrobit jej později rozboru v plnohodnotném analyzátoru na stolním počítači.
+
+Vlastní řešení si vyžádal výběr jmenného prostoru pro spouštěné nástroje. Protože každý testovací port obsluhuje jinou podsíť a mezi oběma prostory neexistuje cesta, nelze nástroj spustit v pevně zvoleném prostoru. Aplikace proto obsahuje metodu \texttt{netns\_for()}, která z adresy zadaného cíle určí, do které podsítě náleží, a příslušný nástroj spustí v odpovídajícím jmenném prostoru. Tento mechanismus je společný pro skener Nmap, testy dostupnosti i zátěžové testy, takže obsluha zadává pouze cílovou adresu a o směrování požadavku se nestará.
 
 \subsection{Adresní autokonfigurace protokolu IPv6}
 \label{sec:autokonfigurace}
@@ -145,7 +151,9 @@ Nejvýznamnější částí testování bylo ověření maximální propustnosti
     \label{fig:speedv4}
 \end{figure}
 
-Při testování propustnosti nad protokolem IPv4 dosáhla síť průměrné rychlosti 276 Mbps (viz Obrázek \ref{fig:speedv4}). Následný test využívající protokol IPv6 prokázal propustnost 274 Mbps (viz Obrázek \ref{fig:speedv6}). Drobné snížení propustnosti u protokolu IPv6 (o 2 Mbps) plně koresponduje s teoretickými předpoklady, jelikož základní hlavička protokolu IPv6 (40 bajtů) je dvakrát větší než hlavička protokolu IPv4 (20 bajtů), což mírně zvyšuje režii na síťové vrstvě.
+Při testování propustnosti nad protokolem IPv4 dosáhla síť průměrné rychlosti 276 Mbps (viz Obrázek \ref{fig:speedv4}). Následný test využívající protokol IPv6 prokázal propustnost 274 Mbps (viz Obrázek \ref{fig:speedv6}). Drobné snížení propustnosti u protokolu IPv6 o 2 Mbps koresponduje s teoretickými předpoklady rozebranými v podkapitole \ref{sec:ipv4_ipv6}, jelikož základní hlavička protokolu IPv6 o velikosti 40 bajtů je dvakrát větší než hlavička protokolu IPv4, což zvyšuje režii na síťové vrstvě.
+
+Naměřené hodnoty je ovšem nutné vztáhnout k možnostem použité platformy. Obě čísla se pohybují těsně pod hranicí 300 Mbps, kterou výrobce uvádí jako nejvyšší dosažitelnou propustnost ethernetového rozhraní připojeného přes sběrnici USB 2.0 \cite{rpi3bplus}. Měření tedy neurčilo propustnost testované linky, nýbrž narazilo na strop samotného analyzátoru. Tato skutečnost nesnižuje hodnotu srovnání obou protokolů, které proběhlo za zcela shodných podmínek na tomtéž hardwaru, vymezuje však oblast použitelnosti přístroje: k ověření funkčnosti spoje, k porovnání protokolů a k odhalení hrubých závad je zařízení způsobilé, k certifikaci gigabitové linky na její jmenovité rychlosti nikoli. Odstranění tohoto omezení by vyžadovalo přechod na novější generaci jednodeskového počítače s ethernetovým řadičem mimo sběrnici USB.
 
 \begin{figure}[htbp]
     \centering
