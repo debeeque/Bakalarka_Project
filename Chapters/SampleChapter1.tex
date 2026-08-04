@@ -78,6 +78,41 @@ Autokonfiguraci tedy bránily dvě okolnosti současně, nikoli jedna. Nastaven�
 
 Z uvedeného pozorování plyne závěr, který je pro hodnocení celého zařízení podstatnější než samotná oprava konfigurace. Rozdíl mezi oběma protokoly nespočívá v množství ruční práce na straně obsluhy, neboť moderní správci síťových připojení si profil vytvoří samočinně u obou protokolů. Rozdíl spočívá v tom, zda je na cílové stanici vůbec zapotřebí nějaký proces: u protokolu IPv4 bez klienta DHCP adresa nevznikne nikdy, kdežto u protokolu IPv6 přiděluje jádro adresu lokální linky ihned po zdvižení rozhraní a při zdviženém příznaku A z inzerovaného prefixu sestaví i adresu globálního dosahu. Přenosný analyzátor tak dokáže oslovit protistranu i tehdy, kdy na ní neběží žádná služba pro konfiguraci sítě.
 
+\subsection{Audit zpráv Router Advertisement}
+\label{sec:audit_ra}
+
+Zjištění popsaná v předchozí podkapitole ukázala, že o způsobu adresování celého segmentu rozhoduje obsah jediné zprávy. Stanice si sama neověřuje, kdo zprávu Router Advertisement odeslal, a přijme ji od kohokoli, kdo ji v segmentu vyšle \cite{rfc4861}. Pro diagnostický přístroj z toho plyne přímý úkol: umět tuto zprávu zachytit, rozebrat na jednotlivé položky a posoudit, zda odpovídá tomu, co norma předepisuje. Analyzátor byl proto rozšířen o modul auditu, který tuto úlohu plní.
+
+Rozbor je realizován samostatným skriptem \texttt{ra\_audit.py}, nikoli kódem uvnitř řídicí aplikace. Důvod je technický. Příkaz \texttt{ip netns exec} mění jmenný prostor celého procesu, kdežto řídicí aplikace běží ve výchozím prostoru a musí v něm zůstat, aby obsluhovala displej. Naslouchající kód tedy musí být samostatným podprocesem, stejně jako je tomu u skenování protokolem ARP. Vedlejším přínosem tohoto uspořádání je, že skript zůstává použitelný i samostatně z příkazové řádky.
+
+Skript nejprve spustí naslouchání zprávám protokolu ICMPv6 a poté sám vyšle zprávu Router Solicitation na skupinovou adresu \texttt{ff02::2}, takže na odpověď nemusí čekat po dobu periodického ohlašování směrovače. Ze zachycených zpráv jsou vyčteny hodnota Cur Hop Limit, příznaky M a O, preference směrovače, doba jeho platnosti a časovače Reachable a Retrans, z nesených voleb pak Prefix Information včetně příznaků L, A a R a obou dob životnosti, dále MTU, adresy rekurzivních jmenných serverů a fyzická adresa odesílatele. Nad takto rozebranou zprávou je proveden soubor kontrol: zda hodnota Cur Hop Limit odpovídá předepsané hodnotě 255 a zda je zdrojová adresa adresou lokální linky \cite{rfc4861}, zda délka inzerovaného prefixu činí 64 bitů v případě, že je u něj zdvižen příznak A \cite{rfc4862}, zda preferovaná doba životnosti nepřevyšuje dobu platnosti, zda inzerovaná hodnota MTU neklesá pod minimum 1280 bajtů předepsané pro protokol IPv6 \cite{rfc8200} a zda se fyzická adresa v rámci shoduje s adresou uvedenou ve volbě. Každé hlášení nese odkaz na příslušný dokument přímo ve svém textu, aby obsluha nemusela dohledávat, o který požadavek se opírá.
+
+Při ověřování se ukázala okolnost, která zásadně ovlivnila návrh celého modulu. Původní záměr rozdělit zachycené zprávy pouze na vlastní a cizí podle fyzické adresy odesílatele se ukázal jako nedostatečný, neboť rozhraní typu \texttt{AF\_PACKET} zachytává i rámce odcházející z téhož rozhraní. Přístroj tak ohlašoval přítomnost směrovače v segmentu ve chvíli, kdy pouze pozoroval vlastní vysílání serveru dnsmasq. Skutečnost byla potvrzena odděleným zachytáváním obou směrů nástrojem tcpdump, které na generujícím portu prokázalo pouze odchozí zprávu a žádnou příchozí. Původ zprávy je proto rozlišován ve třech stupních: rámec odeslaný týmž portem, rámec pocházející z druhého portu téhož přístroje a zachycený po vedení, a konečně rámec cizího směrovače, který jediný je důvodem k výstraze. Fyzické adresy vlastních rozhraní předává skriptu řídicí aplikace, protože pseudosouborový systém, z něhož se odečítají, je vázán na jmenný prostor a z jednoho prostoru nelze adresu rozhraní z prostoru druhého přečíst.
+
+Z téhož mechanismu plyne omezení, které bylo nutné přijmout. Přístroj nedokáže vyžádat a odečíst zprávu Router Advertisement na tomtéž portu, který ji vysílá, neboť žádost odchází přímo na linkové vrstvě mimo síťový zásobník a server dnsmasq v témž jmenném prostoru ji nezaznamená. Zpráva tedy musí projít po vedení. Ověření modulu proto probíhá v uspořádání, kdy jsou oba testovací porty propojeny jediným kabelem přímo mezi sebou; každý z nich pak slyší ohlašování protějšku a rozbor je možné provést symetricky z obou stran.
+
+V uživatelském rozhraní byla pro tuto funkci zavedena samostatná skupina prvků označená \enquote{IPv6 Audit}, obsahující přepínač testovaného portu a tlačítko pro spuštění rozboru. Souhrnný stav segmentu, tedy počet ohlašujících směrovačů a z toho počet cizích, je zároveň vypisován na přehledový panel aplikace.
+
+\subsection{Vyhledávání sousedů a odstranění napevno zapsaných adres}
+\label{sec:vyhledavani_sousedu}
+
+První verze řídicí aplikace pracovala s adresami protistrany zapsanými napevno, tedy s předpokladem, že cílová stanice získala adresu právě od serveru dnsmasq běžícího na analyzátoru. Takový předpoklad platí na laboratorním stanovišti, nikoli však v terénu, kde připojené zařízení může mít adresní plán zcela vlastní. Zjištění z podkapitoly \ref{sec:autokonfigurace}, totiž že adresa sestavená bezstavovou autokonfigurací je z fyzické adresy vypočitatelná, přitom nabízí přímou cestu, jak tento předpoklad odstranit.
+
+Funkci zajišťuje skript \texttt{neigh\_scan.py}. Ten vyšle zprávu Echo Request na skupinovou adresu všech uzlů \texttt{ff02::1} a odpovědi doplní o obsah tabulky sousedů udržované jádrem. Ke každé nalezené fyzické adrese je postupem EUI-64 dopočten identifikátor rozhraní a porovnán s adresou lokální linky, kterou soused skutečně používá. Shoda obou hodnot znamená, že stanice sestavuje identifikátor klasickým postupem z fyzické adresy; neshoda naopak, že používá identifikátor neprozrazující hardware, jehož generování popisuje \cite{rfc7217} a jehož smyslem je zabránit sledování stanice napříč sítěmi. Toto rozlišení má pro diagnostiku praktický dopad, neboť určuje, zda je adresu protistrany vůbec možné odvodit výpočtem. Je-li odvození možné, sestaví skript pro každý prefix nastavený na testovaném portu odpovídajícího kandidáta a každého z nich ověří testem dostupnosti, takže do výsledku nevstupuje domněnka, nýbrž potvrzená adresa. Pořadí prefixů není náhodné: první je zpracován prefix zadaný na portu staticky, teprve poté prefix převzatý ze zprávy Router Advertisement, aby přístroj za cíl označil adresu z vlastního segmentu, a nikoli z prefixu sousedního portu.
+
+Obdobnou úpravou prošlo i skenování protokolem ARP, jež bylo dosud vázáno na jediný jmenný prostor a jedinou podsíť, tedy trpělo touž vadou jako dříve popsané spouštění skeneru Nmap: na monitorovacím segmentu nefungovalo vůbec. Skript nyní přijímá rozhraní a rozsah jako parametry a z výsledku vypouští vlastní fyzickou adresu. Oba skripty na svém posledním řádku vypisují nalezený cíl ve strojově čitelném tvaru, který si řídicí aplikace přečte; skripty tak zůstávají samostatnými nástroji a současně slouží jako zdroj dat pro rozhraní.
+
+Na straně řídicí aplikace byly parametry obou testovacích portů, tedy jmenný prostor, rozhraní, rozsah adres protokolu IPv4 a záložní adresy, soustředěny do jediné datové struktury namísto dřívějšího rozptýlení mezi jednotlivé metody. Tlačítko pro vyhledání sousedů spustí oba skripty ve zvoleném prostoru, nalezené cíle si aplikace zapamatuje a dosazuje je do následných testů; do výpisu přitom uvádí, zda byl cíl nalezen, nebo zda bylo použito záložní zapsané hodnoty. Testy dostupnosti a zátěžové testy se nyní spouštějí přímo ve jmenném prostoru zvoleného portu, neboť nalezená adresa může náležet prefixu portu sousedního a dříve popsaný výběr prostoru podle podsítě cíle by požadavek odeslal nesprávným rozhraním. Tento výběr zůstal zachován pro pole skeneru Nmap, kam obsluha zadává adresu ručně.
+
+\subsection{Přizpůsobení rozhraní dotykovému ovládání}
+\label{sec:dotykove_ovladani}
+
+Provoz přístroje bez připojených periferií klade na uživatelské rozhraní požadavky, které se u aplikace ovládané myší neprojeví. Dotyková vrstva použitého displeje je řízena obvodem ADS7846, jde tedy o panel odporového typu. Takový panel reaguje na tlak, rozpozná pouze jeden dotyk a jeho přesnost je nejnižší při okrajích činné plochy, což je vlastnost samotné konstrukce, nikoli nastavení systému. Prvky umístěné u okraje obrazovky se proto zasahují obtížně a nejhůře se zasahují prvky drobné.
+
+Řešením zvoleným v této práci je provoz aplikace v celoobrazovkovém režimu. Odpadá tím záhlaví okna i systémový panel prostředí, tedy právě ty ovládací prvky, které jsou nejmenší a leží u okraje displeje; aplikaci lze ukončit pouze velkým tlačítkem umístěným uvnitř rozhraní. Vedlejším přínosem je přibližně šedesát obrazových bodů výšky navrácených výpisu, jenž je při rozlišení 800 na 480 bodů nejvíce omezenou částí rozvržení. Drobným tlačítkům a přepínačům byla současně zvětšena vnitřní výplň, čímž se zvětšila jejich činná plocha na výšku, aniž by se změnila šířka, která je u řádku ovládacích prvků skeneru využita beze zbytku.
+
+Zvětšení celého systémového prostředí bylo zvažováno a zamítnuto. Při rozlišení 800 na 480 bodů vede zdvojnásobení měřítka k tomu, že se na plochu nevejdou ani dialogová okna prostředí, a zvýšení hodnoty rozlišení písma by zvětšilo i vlastní rozhraní analyzátoru, jehož rozvržení je pro tento displej vyměřeno beze zbytku. Pro zpřesnění dotyku u okrajů je ostatně měřítko nástrojem nevhodným; vhodným je kalibrace panelu, tedy pořízení převodní matice mezi souřadnicemi dotykové vrstvy a obrazu. Ta vyžaduje fyzickou přítomnost obsluhy u přístroje, a je proto uvedena mezi náměty na pokračování práce.
+
 \section{Zhodnocení dosažených výsledků}
 \label{sec:zhodnoceni}
 
@@ -139,6 +174,58 @@ Samostatně byla ověřena také funkce mapování topologie realizovaná knihov
     \label{fig:arp_scan}
 \end{figure}
 
+\subsection{Ověření auditu protokolu IPv6}
+\label{sec:overeni_auditu}
+
+Modul auditu popsaný v podkapitolách \ref{sec:audit_ra} a \ref{sec:vyhledavani_sousedu} byl ověřen v uspořádání, které si vyžádalo výše uvedené omezení, totiž propojením obou testovacích portů jediným kabelem přímo mezi sebou. Obě linky se ustavily na rychlosti 1000 Mbps v plně duplexním režimu. Uspořádání přineslo vedle vlastního ověření také nezávislé potvrzení dřívějšího pozorování: jakmile byl kabel zapojen, sestavilo si jádro analyzátoru na obou rozhraních adresy z prefixů ohlašovaných protějším portem a označilo je příznakem \texttt{proto kernel\_ra}. Protistrana pro následné testy tedy nevznikla ručním nastavením, nýbrž samočinně.
+
+Rozbor zprávy Router Advertisement zachycené na generujícím portu je zachycen na Obrázku \ref{fig:ra_scan}. Přístroj správně určil, že ohlašující směrovač je jeho vlastní monitorovací port, neboť fyzická adresa odesílatele odpovídá jednomu z jeho rozhraní a zpráva byla přijata po vedení, nikoli odeslána tímtéž portem. Z obsahu zprávy byl vyčten inzerovaný prefix \texttt{fd00:1::/64} s dobou platnosti 43\,200 sekund, hodnota MTU 1500 bajtů a doba platnosti směrovače 1800 sekund.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{Figures/gui_ra_scan.png}
+    \caption{Rozbor zprávy Router Advertisement zachycené druhým portem analyzátoru}
+    \label{fig:ra_scan}
+\end{figure}
+
+Teprve toto uspořádání umožnilo ověřit chování popsané v podkapitole \ref{sec:autokonfigurace} měřením provedeným samotným přístrojem, tedy bez pomoci nástrojů nainstalovaných na cílové stanici. Byla-li konfigurace serveru dnsmasq ponechána v původním tvaru, ohlásil audit u inzerovaného prefixu zhasnutý příznak A a vypsal upozornění, že bezstavová autokonfigurace je zakázána. Po doplnění klíčového slova \texttt{slaac} do téhož parametru ohlásil týž prefix s příznakem A zdviženým. Hodnoty uvedené v Tabulce \ref{tab:ra_flags} jsou tak potvrzeny druhým, nezávislým měřením.
+
+Audit zároveň upozornil na okolnost, která při dřívějším měření zůstala nepovšimnuta. Server dnsmasq po doplnění klíčového slova \texttt{slaac} nadále nastavuje příznak M a současně zdvihá příznak A, takže cílové stanici nabízí oba zdroje adresy zároveň, stavový i bezstavový. Nejde o vadu přístroje ani o chybu v rozboru, nýbrž o přesný popis toho, jak se použitý server chová; přijímající stanice pak podle vlastní implementace může získat adresy obě, což je také přesně to, co bylo v Tabulce \ref{tab:adresy} pozorováno.
+
+Samotné kontroly nebylo možné ověřit na skutečném provozu, neboť v testovaném segmentu se žádný nesprávně nastavený ani cizí směrovač nevyskytuje. Byly proto ověřeny na programově sestaveném pracovišti tvořeném dvojicí dočasných jmenných prostorů spojených virtuálním párem rozhraní, do něhož byla vložena záměrně vadná zpráva. Ta nesla hodnotu Cur Hop Limit 64 namísto předepsaných 255, zdrojovou adresu mimo rozsah lokální linky, prefix délky 48 bitů se zdviženým příznakem A, preferovanou dobu životnosti vyšší než dobu platnosti, hodnotu MTU 1200 bajtů a fyzickou adresu ve volbě odlišnou od adresy v rámci. Přístroj označil všechny uvedené nesrovnalosti současně a zprávu vyhodnotil jako pocházející od cizího směrovače.
+
+Funkce vyhledání protistrany byla ověřena na témže vedení. Přístroj nalezl jediného souseda, dopočetl z jeho fyzické adresy identifikátor rozhraní a zjistil, že se shoduje s adresou lokální linky, kterou soused používá; ohlásil tedy klasický postup podle fyzické adresy, nikoli identifikátor podle \cite{rfc7217}. Pro oba prefixy nastavené na portu sestavil odpovídající adresu a obě ověřil jako dosažitelné (viz Obrázek \ref{fig:neigh_scan}). Následný test dostupnosti již proběhl na adresu takto nalezenou, nikoli na adresu zapsanou v aplikaci, a skončil bez ztráty paketů (viz Obrázek \ref{fig:ping_discovered}).
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{Figures/gui_neigh_scan.png}
+    \caption{Vyhledání sousedů v segmentu a odvození jejich adres postupem EUI-64}
+    \label{fig:neigh_scan}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{Figures/gui_ping_discovered.png}
+    \caption{Test dostupnosti provedený na adresu nalezenou vyhledáním sousedů}
+    \label{fig:ping_discovered}
+\end{figure}
+
+Nejcennějším výsledkem tohoto měření je však srovnání obou protokolů provedené na jediném vedení a v jediném okamžiku, které shrnuje Tabulka \ref{tab:sousede}. Skenování protokolem ARP nenalezlo v segmentu žádnou stanici, přestože protistrana byla připojena a odpovídala. Příčina je zřejmá: obě rozhraní náleží odlišným podsítím a na protějším konci neběží žádný klient DHCP, takže adresa z rozsahu monitorovacího portu na něm nikdy nevznikla. Protokol IPv6 nalezl na témže vedení téhož souseda, jeho adresu odvodil z fyzické adresy a ověřil ji testem dostupnosti, a to bez jediného procesu zajišťujícího konfiguraci. Tvrzení vyslovené v podkapitole \ref{sec:autokonfigurace} je tak podloženo měřením, nikoli pouze rozborem konfigurace.
+
+\begin{table}[htbp]
+    \caption{Vyhledání protistrany na témže vedení oběma protokoly}
+    \label{tab:sousede}
+    \centering
+    \begin{tabular}{lll}
+        \hline
+        Protokol & Použitý postup & Výsledek \\
+        \hline
+        IPv4 & skenování ARP v rozsahu \texttt{10.0.1.0/24} & nenalezena žádná stanice \\
+        IPv6 & dotaz na \texttt{ff02::1} a tabulka sousedů & nalezen soused, adresa ověřena \\
+        \hline
+    \end{tabular}
+\end{table}
+
 \subsection{Měření propustnosti}
 \label{sec:mereni_propustnosti}
 
@@ -195,3 +282,12 @@ Správnost obou zátěžových testů potvrdily také logy zachycené na straně
     \caption{Výstup nástroje iperf3 na straně cílového serveru (IPv4 i IPv6 spojení)}
     \label{fig:iperf_server}
 \end{figure}
+
+\subsection{Vady odhalené při opakovaném ověřování}
+\label{sec:odhalene_vady}
+
+Vedle vady ve výběru jmenného prostoru popsané v podkapitole \ref{sec:skenovani} odhalilo opakované ověřování prototypu ještě dvě další. Obě stojí za uvedení, neboť ani jedna se neprojevila při prvním průchodu měřením a obě mohly zůstat skryté až do nasazení přístroje mimo laboratoř.
+
+První z nich se týkala inicializačního skriptu. Spuštění přípravy síťového prostředí podruhé v témže běhu systému selhalo hlášením, že rozhraní generujícího portu neexistuje, a příslušný jmenný prostor zůstal prázdný. Příčinou je způsob, jakým jádro nakládá s fyzickými rozhraními při rušení jmenného prostoru: rozhraní se do výchozího prostoru vracejí až po dokončení úklidu, tedy s jistým zpožděním, kdežto skript se je pokoušel přesunout okamžitě. První z obou rozhraní se do doby pokusu vrátit stihlo, druhé nikoli. Při prvním spuštění po zapnutí přístroje se vada neprojevila, neboť obě rozhraní se ve výchozím prostoru již nacházela, a proto zůstala až dosud nepovšimnuta. Skript nyní na návrat rozhraní vyčká; opakované spuštění proběhne bez chyby.
+
+Druhá vada se týkala řídicí aplikace a byla odhalena způsobem, který stojí za zaznamenání z metodického hlediska. Na pořízeném snímku obrazovky se výpis jevil jako přerušovaný a část textu se na displeji zdvojovala. Obsah výpisu odečtený programově byl přitom bezvadný, z čehož plyne, že se nejednalo o chybu v datech, nýbrž o chybu vykreslování. Skutečná příčina spočívala v tom, že jednotlivé úlohy zapisovaly do prvků grafického rozhraní přímo z vlastních vláken, což použitá knihovna nepřipouští a co v krajním případě nevede k poškozenému obrazu, nýbrž k pádu aplikace. Zápis do prvků rozhraní je proto nyní odkládán do hlavního vlákna. Poznatek je obecnější než tento konkrétní případ: jeví-li se výstup na displeji podezřele, je namístě porovnat jej s daty a nespoléhat na to, co je vidět.
