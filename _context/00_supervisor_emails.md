@@ -168,3 +168,99 @@ S pozdravem,
 
 Pavel Nevlud
 ```
+
+---
+
+## Исходящее письмо, 09.09.2026 — перенос на 2027, отчёт за лето, вопрос про 3D-принтер
+
+Отправлено в начале учебного года. Задачи письма: закрепить перенос защиты на
+2027 и сохранение темы с тем же научруком, показать летний прогресс, приложить
+промежуточный PDF и получить ответ по двум конкретным вопросам про 3D-печать.
+
+Структура выбрана так, чтобы просьба шла **после** отчёта о работе, а не вместо
+него, и чтобы отказ по принтеру не блокировал проект — отсюда фраза про
+коммерческую печать в конце.
+
+```
+Dobrý den,
+
+na začátku nového akademického roku bych Vás rád informoval o stavu
+své bakalářské práce.
+
+Podle Vašeho doporučení jsem se rozhodl odevzdat práci až v roce 2027
+a využít získaný čas na její vylepšení. Téma bych rád ponechal beze
+změny a chtěl bych Vás požádat, zda byste mohl pokračovat ve vedení mé
+práce.
+
+Přes léto jsem se věnoval především praktické části:
+
+- Rozšířil jsem zařízení o audit protokolu IPv6: analyzátor zpráv
+  Router Advertisement s vyhodnocením příznaků M, O a A, a vyhledávání
+  sousedů přes NDP. Vznikly dva nové skripty.
+
+- Vyřešil jsem problém s automatickou konfigurací adres IPv6. Ukázalo
+  se, že dnsmasq při stavovém dhcp-range shazoval kromě příznaku M také
+  příznak A, čímž znemožnil bezstavovou autokonfiguraci. Řešením bylo
+  doplnění klíčového slova slaac. Měřením jsem ověřil, že si cílová
+  stanice sestaví globální adresu z prefixu bez jakéhokoli procesu
+  v uživatelském prostoru.
+
+- Odstranil jsem chybu, kvůli které Nmap hlásil failed to determine
+  route. Sken se spouštěl v nesprávném síťovém jmenném prostoru; nyní
+  se jmenný prostor volí podle podsítě cíle. Napevno zapsané adresy
+  cílů jsem nahradil jejich automatickým vyhledáním.
+
+- Upravil jsem grafické rozhraní: celoobrazovkový režim a oprava
+  vláknové bezpečnosti.
+
+- Textová část má nyní přibližně 8 500 slov a zkušební sazba vychází na
+  více než 30 stran od Úvodu po Závěr. Doplnil jsem přílohy o všechny
+  zdrojové kódy, vyčistil seznam literatury (14 zdrojů, všechny
+  citované v textu) a doplnil sekci Vlastní přínos autora.
+
+V příloze posílám průběžnou verzi práce k nahlédnutí.
+
+Zbývá tedy především to, co jste doporučoval: akumulátorový modul
+a krabička.
+
+U napájení jsem vybral UPS modul s články 18650, který podporuje
+nabíjení za provozu a měření stavu baterie po sběrnici I2C — zbývající
+kapacitu tak bude možné zobrazovat přímo v aplikaci zařízení. Než modul
+objednám, chci změřit skutečnou spotřebu zařízení v jednotlivých
+režimech, aby byla kapacita zvolena podle naměřených hodnot.
+
+U krabičky jsem zjistil, že běžně prodávané krabičky nevyhovují:
+zařízení potřebuje tři konektory RJ45 (integrovaný Ethernet a dva
+USB/LAN adaptéry), okno pro pětipalcový displej a prostor pro
+akumulátor vedle desek. Chtěl bych proto navrhnout vlastní krabičku
+v parametrickém CAD a nechat ji vytisknout na 3D tiskárně.
+
+Rád bych se proto zeptal:
+
+1. Má univerzita 3D tiskárny, které by bylo možné pro tento účel
+   využít, případně na koho se mám obrátit?
+
+2. Doporučil byste konkrétní materiál? Uvnitř je Raspberry Pi, které se
+   zahřívá, počítám proto spíše s PETG než s PLA.
+
+Pokud tisk na univerzitě možný nebude, zajistím jej komerčně.
+
+Dále mám v plánu pořídit nové snímky obrazovky přímo ze zařízení
+(současné jsou vyfocené fotoaparátem), rozšířit panel pro sledování
+provozu o statistiky, které poskytnou čísla do kapitoly se zhodnocením
+výsledků, a nově vyfotit schéma zapojení, jak jste dříve doporučoval.
+
+Budu rád za jakékoli připomínky.
+
+S pozdravem,
+Mikhail Mukanov
+```
+
+**Приложение:** промежуточная версия `BachelorThesis.pdf`. Сборка от 04.08.2026
+весит 49 МБ и по университетской почте не уходит — отправляется сжатая копия.
+Настоящее лечение размера (пересъёмка восьми `gui_*.JPG` через `scrot`,
+45 МБ → 0,5 МБ) остаётся в плане и нужно для лимита EDISON в 20 МБ.
+
+**Ожидаемый ответ и что с ним делать:** согласие на перенос и продолжение
+руководства; по принтеру — либо контакт лаборатории, либо отказ, после которого
+идём в коммерческую печать; возможны новые замечания к тексту.
