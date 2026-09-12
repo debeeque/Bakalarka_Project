@@ -1,40 +1,57 @@
 // Portable Network Analyzer - enclosure, exploratory model.
 //
-// STATUS: geometry skeleton. Every value in the "Provisional" group comes from
-// a ruler, a datasheet or an official drawing - NOT from the caliper. Connector
-// cutouts are placeholders at invented coordinates. Nothing here is printable
-// as a final part. Probe B at the bottom of this file is the exception: it
-// depends only on verified constants and can be printed as is.
+// STATUS: geometry skeleton. Values in the "Provisional" group come from a
+// ruler, a datasheet or an official drawing - NOT from the caliper. Panel
+// feature positions are a design proposal, not measurements. Nothing here is
+// printable as a final part except probe_b, which depends only on verified
+// constants.
+//
+// Panel layout follows the decision recorded in _context/05_akum_korpus.md:
+// both USB/LAN dongles stay inside and are patched to three keystone RJ45
+// jacks on the panel. Nothing outside has to line up with the Pi's own USB or
+// Ethernet connectors. Only three things are dictated by the hardware - the
+// microSD slot, the display window and the display mounting holes.
 
 /* [What to render] */
 part = "all"; // [all, tray, lid, probe_b]
-show_placeholder_cuts = true;
 
 /* [Verified constants] */
-wall       = 2.4;   // shell thickness
-divider_t  = 2.4;   // wall between board bay and battery bay
+wall       = 2.4;
+divider_t  = 2.4;
 lid_t      = 2.4;
-clr        = 1.5;   // clearance around a board
+clr        = 1.5;
 corner_r   = 4.0;
 hole_fudge = 0.4;   // FDM holes come out undersized
-cut_fudge  = 0.5;   // per side, connector cutouts
+cut_fudge  = 0.5;   // per side, panel cutouts
 screw_d    = 2.5;   // M2.5
 nut_af     = 5.0;   // M2.5 nut across flats
 nut_h      = 2.0;
 boss_d     = 8.0;
-boss_embed = 1.0;   // bosses must overlap the wall, not touch it tangentially:
-                    // zero-thickness contact breaks the mesh
+boss_embed = 1.0;   // bosses overlap the wall; tangential contact breaks the mesh
 
 /* [Provisional - replace after caliper] */
-sandwich_l = 125.0; // ruler, 17.08.2026
+sandwich_l = 125.0; // ruler, 17.08.2026, includes protruding parts
 sandwich_w = 90.0;  // ruler
-sandwich_h = 25.0;  // ruler
 ups_l      = 60.0;  // datasheet, module not bought
 ups_w      = 93.0;  // datasheet
-ups_h      = 25.0;  // datasheet
 lcd_act_l  = 109.0; // computed from 5" diagonal at 800x480, not measured
 lcd_act_w  = 65.0;  // same
 bay_h      = 30.0;  // chosen, not derived
+
+/* [Panel features - sizes need the real parts, positions are a proposal] */
+keystone_w     = 14.5;  // standard snap-in opening; verify on the real jack
+keystone_h     = 16.0;
+keystone_n     = 3;
+keystone_pitch = 22.0;
+keystone_x0    = 20.0;  // from the inner left of the board bay
+keystone_z     = 5.0;   // above the bay floor
+dc_jack_d      = 8.0;   // DC5521 panel mount barrel; verify
+switch_w       = 13.0;  // panel switch window; verify
+switch_h       = 8.0;
+sd_slot_w      = 16.0;  // TODO caliper: microSD protrusion plus clearance
+sd_slot_h      = 3.5;
+sd_slot_y      = 28.0;  // TODO caliper: position of the card along the Pi edge
+sd_slot_z      = 4.0;
 
 /* [Derived] */
 bay1_x  = sandwich_l + 2 * clr;
@@ -51,15 +68,6 @@ boss_pos = [
     [outer_x - boss_in, boss_in],
     [boss_in,           outer_y - boss_in],
     [outer_x - boss_in, outer_y - boss_in]
-];
-
-// [label, x from inner left, z from bay floor, width, height]
-// TODO placeholders. Real coordinates come from block 5 of the measurement
-// protocol, referenced to one corner of the Pi board.
-front_cuts = [
-    ["rj45",  12, 1, 16.0, 14.0],
-    ["usb_ab", 34, 1, 15.5,  8.5],
-    ["usb_cd", 56, 1, 15.5,  8.5]
 ];
 
 module rbox(x, y, z, r) {
@@ -96,10 +104,34 @@ module vents() {
             cube([slot_w, slot_l, wall + 2]);
 }
 
-module front_cutouts() {
-    for (c = front_cuts)
-        translate([wall + c[1] - cut_fudge, -1, wall + c[2] - cut_fudge])
-            cube([c[3] + 2 * cut_fudge, wall + 2, c[4] + 2 * cut_fudge]);
+// Front wall: three keystone jacks over the board bay, plus the backlight
+// switch. The backlight slider sits on the display board and is unreachable
+// once the case is closed, so it is wired out to this switch.
+module front_panel() {
+    for (i = [0 : keystone_n - 1])
+        translate([wall + keystone_x0 + i * keystone_pitch - cut_fudge, -1,
+                   wall + keystone_z - cut_fudge])
+            cube([keystone_w + 2 * cut_fudge, wall + 2, keystone_h + 2 * cut_fudge]);
+    translate([wall + bay1_x - 30, -1, wall + keystone_z + 2])
+        cube([switch_w, wall + 2, switch_h]);
+}
+
+// Battery end wall: charging jack and main power switch.
+module battery_end() {
+    translate([outer_x - wall - 1, wall + inner_y * 0.35, wall + 14])
+        rotate([0, 90, 0]) cylinder(d = dc_jack_d + hole_fudge, h = wall + 2, $fn = 32);
+    translate([outer_x - wall - 1, wall + inner_y * 0.62 - switch_w / 2,
+               wall + 14 - switch_h / 2])
+        cube([wall + 2, switch_w, switch_h]);
+}
+
+// Board end wall: slot for the microSD card, which protrudes past the Pi.
+// The card sits on the Pi edge opposite USB and Ethernet, so the sandwich must
+// be oriented with that edge toward this wall - otherwise the card ends up
+// facing the divider and cannot be pulled out at all.
+module sd_slot() {
+    translate([-1, wall + sd_slot_y - sd_slot_w / 2, wall + sd_slot_z])
+        cube([wall + 2, sd_slot_w, sd_slot_h]);
 }
 
 module tray() {
@@ -115,7 +147,9 @@ module tray() {
         }
         boss_holes();
         vents();
-        if (show_placeholder_cuts) front_cutouts();
+        front_panel();
+        battery_end();
+        sd_slot();
     }
 }
 
@@ -154,8 +188,6 @@ if (part == "tray" || part == "all") tray();
 if (part == "lid"  || part == "all") translate([0, 0, tray_h + 12]) lid();
 if (part == "probe_b" || part == "all") translate([0, -35, 0]) probe_b();
 
-// Printed to the console on every F5, so the resulting outer size is always
-// visible without measuring the preview.
 echo(str("outer  : ", outer_x, " x ", outer_y, " x ", tray_h + lid_t, " mm"));
 echo(str("bay1   : ", bay1_x, " x ", inner_y, " x ", bay_h, " mm (boards)"));
 echo(str("bay2   : ", bay2_x, " x ", inner_y, " x ", bay_h, " mm (battery)"));
