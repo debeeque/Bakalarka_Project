@@ -33,3 +33,6 @@ __pycache__/
 # Остальное содержимое .vscode/ (кэши, история) — мимо.
 .vscode/*
 !.vscode/settings.json
+
+# Локальные разрешения Claude Code (у каждого ноутбука свои)
+.claude/settings.local.json
