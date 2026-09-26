@@ -3,6 +3,10 @@
 # "bad interpreter: /bin/bash^M" и скрипт не запускается.
 *.sh text eol=lf
 *.py text eol=lf
+# systemd и NetworkManager читают эти файлы на малине
+*.service text eol=lf
+*.conf text eol=lf
+*.csv text eol=lf
 
 # Исходники работы — тоже LF, чтобы не было мусорных диффов между ноутами
 *.tex text eol=lf
