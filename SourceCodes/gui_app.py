@@ -5,8 +5,10 @@ import os
 import sys
 import threading
 import re
+import time
 
 BASE_DIR = "/home/muk0015/diploma_project"
+UPS_STATUS = "/run/ups/status"
 if os.path.exists(BASE_DIR):
     os.chdir(BASE_DIR)
 
@@ -91,6 +93,9 @@ class AnalyzerApp:
         self.lbl_icmp.pack(side=tk.LEFT, padx=20)
         self.lbl_ra = tk.Label(self.res_frame, text="RA routers: --", font=('Arial', 12))
         self.lbl_ra.pack(side=tk.LEFT, padx=20)
+        self.lbl_bat = tk.Label(self.res_frame, text="Battery: --", font=('Arial', 12, 'bold'), fg="gray")
+        self.lbl_bat.pack(side=tk.RIGHT, padx=10)
+        self.update_battery()
 
         self.log_area = scrolledtext.ScrolledText(self.root, width=90, height=8, font=('Consolas', 9))
         self.log_area.pack(padx=10, pady=5, fill=tk.BOTH, expand=True)
@@ -398,6 +403,29 @@ class AnalyzerApp:
         if self.is_monitoring:
             self.lbl_icmp.config(text=f"Live ICMP/6: {self.stats['ICMP']}")
             self.root.after(500, self.update_labels)
+
+    # Written every 10 s by the ups-monitor service; stale means the service is down
+    def update_battery(self):
+        text, color = "Battery: --", "gray"
+        try:
+            if time.time() - os.path.getmtime(UPS_STATUS) < 30:
+                with open(UPS_STATUS) as f:
+                    fields = dict(re.findall(r"(\w+)=(\S+)", f.read()))
+                pct = int(fields["PCT"])
+                src = fields.get("SRC", "BAT")
+                if src == "BAT":
+                    mins = fields.get("MIN", "-")
+                    left = f" ~{int(mins) // 60}h{int(mins) % 60:02d}" if mins.isdigit() else ""
+                    text = f"Battery: {pct}%{left}"
+                    low = pct < 10 or fields.get("LOW", "0") != "0"
+                    color = "red" if low else "orange" if pct < 25 else "green"
+                else:
+                    text = f"Battery: {pct}% {'charging' if src == 'CHG' else 'AC'}"
+                    color = "darkgreen"
+        except (OSError, KeyError, ValueError):
+            pass
+        self.lbl_bat.config(text=text, fg=color)
+        self.root.after(5000, self.update_battery)
 
     def close_app(self):
         self.is_monitoring = False
