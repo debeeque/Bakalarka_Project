@@ -117,6 +117,69 @@ class OnScreenKeyboard(tk.Frame):
         self.entry.insert(0, text[:-1])
 
 
+class NetworkList(tk.Frame):
+    ROW_H = 54
+    ROW_BG, SEL_BG = "white", "#BBDEFB"
+
+    def __init__(self, parent):
+        super().__init__(parent, bg=BG)
+        self.canvas = tk.Canvas(self, bg=self.ROW_BG, highlightthickness=0)
+        bar = tk.Scrollbar(self, command=self.canvas.yview, width=30)
+        self.canvas.config(yscrollcommand=bar.set)
+        bar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.inner = tk.Frame(self.canvas, bg=self.ROW_BG)
+        item = self.canvas.create_window(0, 0, window=self.inner, anchor="nw")
+        self.inner.bind("<Configure>", lambda e: self.canvas.config(scrollregion=self.canvas.bbox("all")))
+        self.canvas.bind("<Configure>", lambda e: self.canvas.itemconfig(item, width=e.width))
+        self.rows, self.selected = [], None
+
+    def set(self, nets, profiles):
+        for w in self.inner.winfo_children():
+            w.destroy()
+        self.rows, self.selected = [], None
+        for i, n in enumerate(nets):
+            self.rows.append(self.make_row(i, n, n["ssid"] in profiles))
+        self.canvas.yview_moveto(0)
+
+    def make_row(self, i, net, saved):
+        row = tk.Frame(self.inner, bg=self.ROW_BG, height=self.ROW_H)
+        row.pack(fill=tk.X)
+        row.pack_propagate(False)
+        tk.Frame(self.inner, bg="#CFD8DC", height=1).pack(fill=tk.X)
+
+        bars = tk.Canvas(row, width=36, height=30, bg=self.ROW_BG, highlightthickness=0)
+        level = min(4, (net["signal"] + 24) // 25)
+        for b in range(4):
+            h = 8 + b * 7
+            bars.create_rectangle(b * 9, 30 - h, b * 9 + 6, 30, width=0,
+                                  fill="#0277BD" if b < level else "#CFD8DC")
+        bars.pack(side=tk.RIGHT, padx=(4, 12))
+        pct = tk.Label(row, text=f"{net['signal']}%", font=(FONT, 12), fg="#546E7A", bg=self.ROW_BG, width=4, anchor="e")
+        pct.pack(side=tk.RIGHT)
+
+        text = tk.Frame(row, bg=self.ROW_BG)
+        text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=12)
+        name = tk.Label(text, text=net["ssid"], font=(FONT, 15, 'bold'), anchor="w", bg=self.ROW_BG,
+                        fg="#2E7D32" if net["inuse"] else "black")
+        name.pack(fill=tk.X, pady=(5, 0))
+        tags = (["connected"] if net["inuse"] else []) + (["saved"] if saved else []) + \
+               ["secured" if net["secure"] else "open"]
+        info = tk.Label(text, text="  \u00b7  ".join(tags), font=(FONT, 10), fg="#78909C", anchor="w", bg=self.ROW_BG)
+        info.pack(fill=tk.X)
+
+        widgets = (row, bars, pct, text, name, info)
+        for w in widgets:
+            w.bind("<Button-1>", lambda e, k=i: self.select(k))
+        return widgets
+
+    def select(self, i):
+        self.selected = i
+        for k, widgets in enumerate(self.rows):
+            for w in widgets:
+                w.config(bg=self.SEL_BG if k == i else self.ROW_BG)
+
+
 class WifiDialog:
     def __init__(self, root, log=print, on_close=None):
         self.root, self.log, self.on_close = root, log, on_close
@@ -153,15 +216,9 @@ class WifiDialog:
 
     def show_list(self):
         self.clear_page()
-        box = tk.Frame(self.page, bg=BG)
-        box.pack(fill=tk.BOTH, expand=True, padx=8)
-        self.listbox = tk.Listbox(box, font=(FONT, 16), height=8, activestyle="none",
-                                  selectbackground="#0277BD", exportselection=False)
-        self.listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        bar = tk.Scrollbar(box, command=self.listbox.yview, width=30)
-        bar.pack(side=tk.RIGHT, fill=tk.Y)
-        self.listbox.config(yscrollcommand=bar.set)
-        self.fill_list()
+        self.netlist = NetworkList(self.page)
+        self.netlist.pack(fill=tk.BOTH, expand=True, padx=8)
+        self.netlist.set(self.nets, self.profiles)
 
         btns = tk.Frame(self.page, bg=BG)
         btns.pack(fill=tk.X, padx=8, pady=8)
@@ -169,14 +226,6 @@ class WifiDialog:
         tk.Button(btns, text="RESCAN", bg="#607D8B", command=self.rescan, **cfg).pack(side=tk.LEFT, padx=4)
         tk.Button(btns, text="CONNECT", bg="#4CAF50", command=self.connect_selected, **cfg).pack(side=tk.LEFT, padx=4)
         tk.Button(btns, text="DISCONNECT", bg="#E64A19", command=self.disconnect, **cfg).pack(side=tk.RIGHT, padx=4)
-
-    def fill_list(self):
-        self.listbox.delete(0, tk.END)
-        for n in self.nets:
-            mark = "* " if n["inuse"] else "   "
-            lock = "secured" if n["secure"] else "open"
-            saved = ", saved" if n["ssid"] in self.profiles else ""
-            self.listbox.insert(tk.END, f"{mark}{n['ssid']}   {n['signal']}%   {lock}{saved}")
 
     def rescan(self):
         self.set_status("Scanning...", "orange")
@@ -193,8 +242,8 @@ class WifiDialog:
             self.set_status(f"Scan failed: {err[:60]}", "red")
             return
         self.profiles, self.nets = profiles, nets
-        if hasattr(self, 'listbox') and self.listbox.winfo_exists():
-            self.fill_list()
+        if hasattr(self, 'netlist') and self.netlist.winfo_exists():
+            self.netlist.set(nets, profiles)
         self.show_current()
 
     def show_current(self):
@@ -205,11 +254,10 @@ class WifiDialog:
             self.set_status("Not connected", "black")
 
     def connect_selected(self):
-        sel = self.listbox.curselection()
-        if not sel:
+        if self.netlist.selected is None:
             self.set_status("Select a network first", "red")
             return
-        net = self.nets[sel[0]]
+        net = self.nets[self.netlist.selected]
         if net["ssid"] in self.profiles:
             self.run_connect(["con", "up", "id", self.profiles[net["ssid"]]], net, ask_on_fail=True)
         elif not net["secure"]:

@@ -11,6 +11,9 @@ from wifi_dialog import WifiDialog, wifi_status
 
 BASE_DIR = "/home/muk0015/diploma_project"
 UPS_STATUS = "/run/ups/status"
+WELCOME_BG = os.path.join(BASE_DIR, "assets", "welcome_bg.png")
+AUTO_LOCK_S = 600
+SCREEN_OFF_S = 30
 # Exit code that tells ~/.xinitrc to start the desktop instead of restarting the GUI
 SERVICE_EXIT = 3
 if os.path.exists(BASE_DIR):
@@ -37,9 +40,20 @@ class AnalyzerApp:
         self.sniff_process = None
         self.test_running = False
         self.found = {}
+        self.welcome = self.catcher = self.wifi = None
+        self.welcome_gen = 0
+        self.locked = self.screen_off = False
+        self.last_touch = time.monotonic()
 
         self.setup_ui()
         self.show_welcome()
+        self.root.bind_all("<ButtonPress>", self.touched, add="+")
+        try:
+            # DPMS on with zero timeouts: the screen goes off only when locked
+            subprocess.run(["xset", "+dpms", "dpms", "0", "0", "0"], timeout=5)
+        except (OSError, subprocess.SubprocessError):
+            pass
+        self.root.after(5000, self.idle_check)
 
     def setup_ui(self):
         btn_frame = tk.Frame(self.root)
@@ -455,33 +469,43 @@ class AnalyzerApp:
         self.lbl_bat.config(text=f"Battery: {text}", fg=color)
         self.root.after(5000, self.update_battery)
 
-    def show_welcome(self):
-        bg = "#263238"
-        self.welcome = tk.Frame(self.root, bg=bg, cursor="none")
-        self.welcome.place(x=0, y=0, relwidth=1, relheight=1)
-        tk.Label(self.welcome, text="Portable Network Analyzer", font=('Arial', 28, 'bold'), fg="white", bg=bg).pack(pady=(45, 4))
-        tk.Label(self.welcome, text="Device for testing and monitoring networks", font=('Arial', 13), fg="#B0BEC5", bg=bg).pack()
-        info = tk.Frame(self.welcome, bg=bg)
-        info.pack(pady=22)
+    # Welcome screen doubles as the lock screen; drawn on a canvas so text sits on the wallpaper
+    def show_welcome(self, locked=False):
+        if self.welcome is not None and self.welcome.winfo_exists():
+            self.btn_start.config(text="UNLOCK" if locked else "START")
+            return
+        self.welcome_gen += 1
+        c = tk.Canvas(self.root, width=800, height=480, bg="#0B2A30", highlightthickness=0, cursor="none")
+        c.place(x=0, y=0, relwidth=1, relheight=1)
+        self.welcome = c
+        try:
+            self.bg_image = tk.PhotoImage(file=WELCOME_BG)
+            c.create_image(0, 0, image=self.bg_image, anchor="nw")
+        except tk.TclError:
+            pass
+
+        x = 480
+        c.create_text(x, 40, text="Portable Network", font=('Arial', 24, 'bold'), fill="white", anchor="nw")
+        c.create_text(x, 72, text="Analyzer", font=('Arial', 24, 'bold'), fill="white", anchor="nw")
+        c.create_text(x, 114, text="Testing and monitoring networks", font=('Arial', 11), fill="#9FC5C9", anchor="nw")
         self.welcome_info = {}
-        for row, key in enumerate(("Battery", "Ports", "Wi-Fi")):
-            tk.Label(info, text=f"{key}:", font=('Arial', 13), fg="#90A4AE", bg=bg).grid(row=row, column=0, sticky="w", padx=(0, 12))
-            self.welcome_info[key] = tk.Label(info, text="...", font=('Arial', 13), fg="#ECEFF1", bg=bg)
-            self.welcome_info[key].grid(row=row, column=1, sticky="w")
+        for i, key in enumerate(("Battery", "Ports", "Wi-Fi")):
+            y = 156 + i * 24
+            c.create_text(x, y, text=key, font=('Arial', 11), fill="#7FA7AD", anchor="nw")
+            self.welcome_info[key] = c.create_text(x + 68, y, text="...", font=('Arial', 11), fill="white", anchor="nw")
 
-        btns = tk.Frame(self.welcome, bg=bg)
-        btns.pack()
-        cfg = {'fg': "white", 'width': 10}
-        tk.Button(btns, text="START", bg="#4CAF50", font=('Arial', 18, 'bold'), height=2, command=self.welcome.destroy, **cfg).pack(side=tk.LEFT, padx=8)
-        tk.Button(btns, text="WI-FI", bg="#0277BD", font=('Arial', 12, 'bold'), height=3, command=self.open_wifi, **cfg).pack(side=tk.LEFT, padx=8)
-        tk.Button(btns, text="POWER OFF", bg="#f44336", font=('Arial', 12, 'bold'), height=3, command=self.power_off, **cfg).pack(side=tk.LEFT, padx=8)
+        self.btn_start = tk.Button(c, text="UNLOCK" if locked else "START", bg="#43A047", fg="white", bd=0,
+                                   activebackground="#2E7D32", font=('Arial', 18, 'bold'), command=self.unlock)
+        c.create_window(x, 240, window=self.btn_start, anchor="nw", width=300, height=60)
+        wifi = tk.Button(c, text="WI-FI", bg="#0277BD", fg="white", bd=0, font=('Arial', 12, 'bold'), command=self.open_wifi)
+        c.create_window(x, 312, window=wifi, anchor="nw", width=145, height=46)
+        off = tk.Button(c, text="POWER OFF", bg="#E53935", fg="white", bd=0, font=('Arial', 12, 'bold'), command=self.power_off)
+        c.create_window(x + 155, 312, window=off, anchor="nw", width=145, height=46)
+        c.create_text(12, 468, text="Mikhail Mukanov  |  2027", font=('Arial', 9), fill="#5E8A90", anchor="w")
+        self.update_welcome(self.welcome_gen)
 
-        tk.Label(self.welcome, text="Mikhail Mukanov  |  V\u0160B - Technical University of Ostrava, FEI  |  2027",
-                 font=('Arial', 10), fg="#78909C", bg=bg).pack(side=tk.BOTTOM, pady=10)
-        self.update_welcome()
-
-    def update_welcome(self):
-        if not self.welcome.winfo_exists():
+    def update_welcome(self, gen):
+        if gen != self.welcome_gen or self.welcome is None:
             return
 
         def task():
@@ -489,22 +513,65 @@ class AnalyzerApp:
             for cfg in self.PORTS.values():
                 r = subprocess.run(["sudo", "ip", "-n", cfg["ns"], "-br", "link", "show", cfg["iface"]], capture_output=True, text=True)
                 fields = r.stdout.split()
-                state = "not set up" if r.returncode != 0 or len(fields) < 2 else "link up" if fields[1] == "UP" else "no link"
+                state = "not set up" if r.returncode != 0 or len(fields) < 2 else "up" if fields[1] == "UP" else "no link"
                 ports.append(f"{cfg['iface']} {state}")
             ssid, ip = wifi_status()
-            wifi = f"{ssid} ({ip or 'no IP'})" if ssid else "not connected"
             values = {"Battery": self.battery_text()[0],
-                      "Ports": f"{', '.join(ports)}, DHCP/RA {'on' if self.dhcp_on else 'off'}",
-                      "Wi-Fi": wifi}
-            self.ui(self.show_welcome_info, values)
+                      "Ports": f"{', '.join(ports)}, DHCP {'on' if self.dhcp_on else 'off'}",
+                      "Wi-Fi": f"{ssid} ({ip or 'no IP'})" if ssid else "not connected"}
+            self.ui(self.show_welcome_info, gen, values)
 
         threading.Thread(target=task, daemon=True).start()
-        self.root.after(3000, self.update_welcome)
+        self.root.after(3000, self.update_welcome, gen)
 
-    def show_welcome_info(self, values):
-        if self.welcome.winfo_exists():
+    def show_welcome_info(self, gen, values):
+        if gen == self.welcome_gen and self.welcome is not None:
             for key, text in values.items():
-                self.welcome_info[key].config(text=text)
+                self.welcome.itemconfig(self.welcome_info[key], text=text)
+
+    def unlock(self):
+        self.locked = False
+        if self.welcome is not None:
+            self.welcome.destroy()
+            self.welcome = None
+
+    # Screen off is DPMS through X: saves 0.35 W of 4.5 W (measured 26.09.2026);
+    # the backlight has only a mechanical switch and stays lit
+    def touched(self, event=None):
+        self.last_touch = time.monotonic()
+
+    def idle_check(self):
+        idle = time.monotonic() - self.last_touch
+        if not self.locked and idle > AUTO_LOCK_S:
+            self.lock()
+        elif self.locked and not self.screen_off and idle > SCREEN_OFF_S:
+            self.display(False)
+        self.root.after(5000, self.idle_check)
+
+    def lock(self):
+        self.close_menu()
+        for win in (getattr(self, 'numpad', None), self.wifi.win if self.wifi else None):
+            if win is not None and win.winfo_exists():
+                win.destroy()
+        self.locked = True
+        self.show_welcome(locked=True)
+        self.display(False)
+
+    def display(self, on):
+        self.screen_off = not on
+        if on:
+            if self.catcher is not None:
+                self.catcher.destroy()
+                self.catcher = None
+        elif self.catcher is None:
+            # Swallows the waking tap so it cannot press a button on the lock screen
+            self.catcher = tk.Frame(self.root, bg="black", cursor="none")
+            self.catcher.place(x=0, y=0, relwidth=1, relheight=1)
+            self.catcher.bind("<ButtonPress>", lambda e: self.display(True))
+        try:
+            subprocess.run(["xset", "dpms", "force", "on" if on else "off"], timeout=5)
+        except (OSError, subprocess.SubprocessError):
+            pass
 
     def system_menu(self):
         if hasattr(self, 'menu') and self.menu.winfo_exists():
@@ -513,12 +580,13 @@ class AnalyzerApp:
 
         self.menu = tk.Toplevel(self.root)
         self.menu.title("System")
-        self.menu.geometry("360x265+220+105")
+        self.menu.geometry("360x325+220+75")
         self.menu.attributes('-topmost', True)
         self.menu.configure(bg="#ECEFF1", cursor="none")
 
         cfg = {'font': ('Arial', 12, 'bold'), 'height': 2, 'width': 26}
-        tk.Button(self.menu, text="WI-FI", bg="#0277BD", fg="white", command=self.open_wifi, **cfg).pack(padx=10, pady=(12, 5))
+        tk.Button(self.menu, text="LOCK SCREEN", bg="#37474F", fg="white", command=self.lock, **cfg).pack(padx=10, pady=(12, 5))
+        tk.Button(self.menu, text="WI-FI", bg="#0277BD", fg="white", command=self.open_wifi, **cfg).pack(padx=10, pady=5)
         tk.Button(self.menu, text="POWER OFF", bg="#f44336", fg="white", command=self.power_off, **cfg).pack(padx=10, pady=5)
         tk.Button(self.menu, text="SERVICE MODE (DESKTOP)", bg="#607D8B", fg="white", command=lambda: self.close_app(SERVICE_EXIT), **cfg).pack(padx=10, pady=5)
         tk.Button(self.menu, text="CANCEL", command=self.menu.destroy, **cfg).pack(padx=10, pady=5)
@@ -529,7 +597,7 @@ class AnalyzerApp:
 
     def open_wifi(self):
         self.close_menu()
-        WifiDialog(self.root, self.log)
+        self.wifi = WifiDialog(self.root, self.log)
 
     def stop_sniffer(self):
         self.is_monitoring = False
