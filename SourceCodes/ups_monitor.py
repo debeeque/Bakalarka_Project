@@ -127,7 +127,7 @@ def monitor(bus, args):
 
     def event(text):
         t = time.monotonic()
-        stamp = datetime.now().isoformat(timespec="seconds")
+        stamp = datetime.now().astimezone().isoformat(timespec="seconds")
         print(f"{stamp} {text}", flush=True)
         if log:
             write(log, f"# {t:.1f} {stamp} {text}")
