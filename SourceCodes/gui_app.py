@@ -6,11 +6,13 @@ import sys
 import threading
 import re
 import time
+import json
 
 from wifi_dialog import WifiDialog, wifi_status
 
 BASE_DIR = "/home/muk0015/diploma_project"
 UPS_STATUS = "/run/ups/status"
+PORT_STATUS = "/run/analyzer/ports.json"
 WELCOME_BG = os.path.join(BASE_DIR, "assets", "welcome_bg.png")
 AUTO_LOCK_S = 600
 SCREEN_OFF_S = 30
@@ -21,9 +23,9 @@ if os.path.exists(BASE_DIR):
 
 class AnalyzerApp:
     PORTS = {
-        "MONITOR": {"ns": "analyzer_monitor", "iface": "eth1", "net4": "10.0.1.0/24",
+        "MONITOR": {"ns": "analyzer_monitor", "iface": "mon0", "net4": "10.0.1.0/24",
                     "v4": "10.0.1.20", "v6": "fd00:1::20"},
-        "SENDER": {"ns": "analyzer_sender", "iface": "eth2", "net4": "10.0.2.0/24",
+        "SENDER": {"ns": "analyzer_sender", "iface": "snd0", "net4": "10.0.2.0/24",
                    "v4": "10.0.2.20", "v6": "fd00:2::20"},
     }
 
@@ -62,7 +64,7 @@ class AnalyzerApp:
 
         self.btn_dhcp = tk.Button(btn_frame, fg="white", command=self.toggle_dhcp, **btn_cfg)
         self.btn_dhcp.grid(row=0, column=0, padx=5, pady=2)
-        self.dhcp_on = subprocess.run(["pgrep", "-x", "dnsmasq"], capture_output=True).returncode == 0
+        self.dhcp_on = self.port_state().get("dhcp", False)
         self.show_dhcp()
         tk.Button(btn_frame, text="2. ARP SCAN", bg="#2196F3", fg="white", command=self.run_arp_scan, **btn_cfg).grid(row=0, column=1, padx=5, pady=2)
         self.btn_monitor = tk.Button(btn_frame, text="3. LIVE STATS", bg="#607D8B", fg="white", command=self.toggle_monitoring, **btn_cfg)
@@ -100,8 +102,8 @@ class AnalyzerApp:
 
         tk.Label(ra_frame, text="Port:", font=('Arial', 10)).pack(side=tk.LEFT, padx=5)
         self.ra_port = tk.StringVar(value="SENDER")
-        tk.Radiobutton(ra_frame, text="Monitor eth1", variable=self.ra_port, value="MONITOR", font=('Arial', 9), pady=8).pack(side=tk.LEFT, padx=2)
-        tk.Radiobutton(ra_frame, text="Sender eth2", variable=self.ra_port, value="SENDER", font=('Arial', 9), pady=8).pack(side=tk.LEFT, padx=2)
+        for key in ("MONITOR", "SENDER"):
+            tk.Radiobutton(ra_frame, text=f"{key.title()} {self.PORTS[key]['iface']}", variable=self.ra_port, value=key, font=('Arial', 9), pady=8).pack(side=tk.LEFT, padx=2)
 
         tk.Button(ra_frame, text="RA SCAN", bg="#00695C", fg="white", font=('Arial', 9, 'bold'), pady=8, command=self.run_ra_audit, width=10).pack(side=tk.LEFT, padx=5)
         tk.Button(ra_frame, text="NEIGHBORS", bg="#0277BD", fg="white", font=('Arial', 9, 'bold'), pady=8, command=self.run_neigh_scan, width=11).pack(side=tk.LEFT, padx=2)
@@ -188,15 +190,19 @@ class AnalyzerApp:
             return "analyzer_monitor"
         return "analyzer_sender"
 
+    # Written by analyzer-status.service on every link or address change
+    def port_state(self):
+        try:
+            if time.time() - os.path.getmtime(PORT_STATUS) < 30:
+                with open(PORT_STATUS) as f:
+                    return json.load(f)
+        except (OSError, ValueError):
+            pass
+        return {}
+
     def device_macs(self):
-        macs = []
-        for cfg in self.PORTS.values():
-            cmd = ["sudo", "ip", "netns", "exec", cfg["ns"], "cat", "/sys/class/net/%s/address" % cfg["iface"]]
-            res = subprocess.run(cmd, capture_output=True, text=True)
-            mac = res.stdout.strip()
-            if mac:
-                macs.append(mac)
-        return ",".join(macs)
+        ports = self.port_state().get("ports", {})
+        return ",".join(p["mac"] for p in ports.values() if p.get("mac"))
 
     def port_cfg(self):
         return self.PORTS[self.ra_port.get()]
@@ -420,7 +426,7 @@ class AnalyzerApp:
         if not self.is_monitoring:
             self.is_monitoring = True
             self.btn_monitor.config(text="STOP STATS", bg="#FF9800")
-            self.log("Monitor: Passive capture on eth1 (IPv4/v6)...")
+            self.log(f"Monitor: Passive capture on {self.PORTS['MONITOR']['iface']} (IPv4/v6)...")
             self.stats = {"TCP": 0, "UDP": 0, "ICMP": 0}
             threading.Thread(target=self.packet_sniff_thread, daemon=True).start()
             self.update_labels()
@@ -430,7 +436,8 @@ class AnalyzerApp:
             if self.sniff_process: self.sniff_process.terminate()
 
     def packet_sniff_thread(self):
-        cmd = ["sudo", "ip", "netns", "exec", "analyzer_monitor", "tcpdump", "-i", "eth1", "-n", "-l"]
+        cfg = self.PORTS["MONITOR"]
+        cmd = ["sudo", "ip", "netns", "exec", cfg["ns"], "tcpdump", "-i", cfg["iface"], "-n", "-l"]
         try:
             self.sniff_process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
             for line in self.sniff_process.stdout:
@@ -509,12 +516,15 @@ class AnalyzerApp:
             return
 
         def task():
+            state = self.port_state()
             ports = []
             for cfg in self.PORTS.values():
-                r = subprocess.run(["sudo", "ip", "-n", cfg["ns"], "-br", "link", "show", cfg["iface"]], capture_output=True, text=True)
-                fields = r.stdout.split()
-                state = "not set up" if r.returncode != 0 or len(fields) < 2 else "up" if fields[1] == "UP" else "no link"
-                ports.append(f"{cfg['iface']} {state}")
+                p = state.get("ports", {}).get(cfg["iface"], {})
+                text = "absent" if not p.get("present") else f"{p['speed']}" if p.get("carrier") and p.get("speed") else "no link"
+                ports.append(f"{cfg['iface']} {text}")
+            if state:
+                self.dhcp_on = state.get("dhcp", False)
+                self.ui(self.show_dhcp)
             ssid, ip = wifi_status()
             values = {"Battery": self.battery_text()[0],
                       "Ports": f"{', '.join(ports)}, DHCP {'on' if self.dhcp_on else 'off'}",
