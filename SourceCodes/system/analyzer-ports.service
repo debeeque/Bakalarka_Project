@@ -1,0 +1,12 @@
+[Unit]
+Description=Analyzer test ports eth1 and eth2 in network namespaces, nothing served
+Wants=sys-subsystem-net-devices-eth1.device sys-subsystem-net-devices-eth2.device
+After=sys-subsystem-net-devices-eth1.device sys-subsystem-net-devices-eth2.device
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/home/muk0015/diploma_project/setup_network.sh ports
+
+[Install]
+WantedBy=multi-user.target

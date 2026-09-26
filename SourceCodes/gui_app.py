@@ -9,6 +9,8 @@ import time
 
 BASE_DIR = "/home/muk0015/diploma_project"
 UPS_STATUS = "/run/ups/status"
+# Exit code that tells ~/.xinitrc to start the desktop instead of restarting the GUI
+SERVICE_EXIT = 3
 if os.path.exists(BASE_DIR):
     os.chdir(BASE_DIR)
 
@@ -26,6 +28,7 @@ class AnalyzerApp:
         self.root.geometry("800x480")
         # Kiosk mode: no title bar to hit on a resistive touchscreen
         self.root.attributes('-fullscreen', True)
+        self.root.config(cursor="none")
 
         self.stats = {"TCP": 0, "UDP": 0, "ICMP": 0}
         self.is_monitoring = False
@@ -40,11 +43,14 @@ class AnalyzerApp:
         btn_frame.pack(side=tk.TOP, fill=tk.X, pady=5)
         btn_cfg = {'font': ('Arial', 10, 'bold'), 'height': 2, 'width': 14}
 
-        tk.Button(btn_frame, text="1. SETUP NET", bg="#4CAF50", fg="white", command=self.run_setup, **btn_cfg).grid(row=0, column=0, padx=5, pady=2)
+        self.btn_dhcp = tk.Button(btn_frame, fg="white", command=self.toggle_dhcp, **btn_cfg)
+        self.btn_dhcp.grid(row=0, column=0, padx=5, pady=2)
+        self.dhcp_on = subprocess.run(["pgrep", "-x", "dnsmasq"], capture_output=True).returncode == 0
+        self.show_dhcp()
         tk.Button(btn_frame, text="2. ARP SCAN", bg="#2196F3", fg="white", command=self.run_arp_scan, **btn_cfg).grid(row=0, column=1, padx=5, pady=2)
         self.btn_monitor = tk.Button(btn_frame, text="3. LIVE STATS", bg="#607D8B", fg="white", command=self.toggle_monitoring, **btn_cfg)
         self.btn_monitor.grid(row=0, column=2, padx=5, pady=2)
-        tk.Button(btn_frame, text="EXIT", bg="#f44336", fg="white", command=self.close_app, **btn_cfg).grid(row=0, column=3, padx=5, pady=2)
+        tk.Button(btn_frame, text="POWER", bg="#f44336", fg="white", command=self.power_menu, **btn_cfg).grid(row=0, column=3, padx=5, pady=2)
 
         tk.Button(btn_frame, text="SPEED v4", bg="#9C27B0", fg="white", command=self.run_iperf_v4, **btn_cfg).grid(row=1, column=0, padx=5, pady=2)
         tk.Button(btn_frame, text="PING v4", bg="#FF5722", fg="white", command=self.run_ping_v4, **btn_cfg).grid(row=1, column=1, padx=5, pady=2)
@@ -291,10 +297,29 @@ class AnalyzerApp:
 
         threading.Thread(target=task, daemon=True).start()
 
-    def run_setup(self):
-        self.log("System: Refreshing network namespaces (IPv4 & IPv6)...")
-        subprocess.run(["sudo", "./setup_network.sh"])
-        self.log("[OK] Netns and DHCP servers are ready.")
+    # Ports are set up at boot by analyzer-ports.service; serving DHCP and RA
+    # is opt-in, so the device is safe to plug into a foreign network
+    def show_dhcp(self):
+        if self.dhcp_on:
+            self.btn_dhcp.config(text="1. DHCP: ON", bg="#4CAF50")
+        else:
+            self.btn_dhcp.config(text="1. DHCP: OFF", bg="#9E9E9E")
+
+    def toggle_dhcp(self):
+        mode = "nodhcp" if self.dhcp_on else "dhcp"
+        self.log(f"System: {'stopping' if self.dhcp_on else 'starting'} DHCP and RA on both ports...")
+
+        def task():
+            r = subprocess.run(["sudo", "./setup_network.sh", mode], capture_output=True, text=True)
+            out = (r.stdout + r.stderr).strip()
+            if r.returncode == 0:
+                self.dhcp_on = mode == "dhcp"
+                self.log(f"[OK] {out}")
+            else:
+                self.log(f"[FAIL] setup_network.sh {mode}: {out}")
+            self.ui(self.show_dhcp)
+
+        threading.Thread(target=task, daemon=True).start()
 
     def execute_iperf(self, target, proto_name, ns=None):
         if self.test_running: return
@@ -427,11 +452,36 @@ class AnalyzerApp:
         self.lbl_bat.config(text=text, fg=color)
         self.root.after(5000, self.update_battery)
 
-    def close_app(self):
+    def power_menu(self):
+        if hasattr(self, 'power') and self.power.winfo_exists():
+            self.power.destroy()
+            return
+
+        self.power = tk.Toplevel(self.root)
+        self.power.title("Power")
+        self.power.geometry("360x205+220+140")
+        self.power.attributes('-topmost', True)
+        self.power.configure(bg="#ECEFF1", cursor="none")
+
+        cfg = {'font': ('Arial', 12, 'bold'), 'height': 2, 'width': 26}
+        tk.Button(self.power, text="POWER OFF", bg="#f44336", fg="white", command=self.power_off, **cfg).pack(padx=10, pady=(12, 5))
+        tk.Button(self.power, text="SERVICE MODE (DESKTOP)", bg="#607D8B", fg="white", command=lambda: self.close_app(SERVICE_EXIT), **cfg).pack(padx=10, pady=5)
+        tk.Button(self.power, text="CANCEL", command=self.power.destroy, **cfg).pack(padx=10, pady=5)
+
+    def stop_sniffer(self):
         self.is_monitoring = False
         if self.sniff_process: self.sniff_process.terminate()
+
+    def power_off(self):
+        self.power.destroy()
+        self.stop_sniffer()
+        self.log("Shutting down...")
+        subprocess.Popen(["sudo", "shutdown", "-h", "now"])
+
+    def close_app(self, code=0):
+        self.stop_sniffer()
         self.root.destroy()
-        sys.exit()
+        sys.exit(code)
 
 if __name__ == "__main__":
     root = tk.Tk()
