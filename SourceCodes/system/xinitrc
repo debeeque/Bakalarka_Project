@@ -5,6 +5,9 @@ xset s off -dpms s noblank
 cd /home/muk0015/diploma_project || exit 1
 while :; do
     python3 gui_app.py >> /tmp/gui_app.log 2>&1
-    [ "$?" -eq 3 ] && /etc/X11/Xsession
+    if [ "$?" -eq 3 ]; then
+        /etc/X11/Xsession
+        pkill -x -u "$(id -u)" "openbox|lxpanel-pi|pcmanfm|xcompmgr|lxpolkit"
+    fi
     sleep 2
 done

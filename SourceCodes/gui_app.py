@@ -7,6 +7,8 @@ import threading
 import re
 import time
 
+from wifi_dialog import WifiDialog, wifi_status
+
 BASE_DIR = "/home/muk0015/diploma_project"
 UPS_STATUS = "/run/ups/status"
 # Exit code that tells ~/.xinitrc to start the desktop instead of restarting the GUI
@@ -37,6 +39,7 @@ class AnalyzerApp:
         self.found = {}
 
         self.setup_ui()
+        self.show_welcome()
 
     def setup_ui(self):
         btn_frame = tk.Frame(self.root)
@@ -50,7 +53,7 @@ class AnalyzerApp:
         tk.Button(btn_frame, text="2. ARP SCAN", bg="#2196F3", fg="white", command=self.run_arp_scan, **btn_cfg).grid(row=0, column=1, padx=5, pady=2)
         self.btn_monitor = tk.Button(btn_frame, text="3. LIVE STATS", bg="#607D8B", fg="white", command=self.toggle_monitoring, **btn_cfg)
         self.btn_monitor.grid(row=0, column=2, padx=5, pady=2)
-        tk.Button(btn_frame, text="POWER", bg="#f44336", fg="white", command=self.power_menu, **btn_cfg).grid(row=0, column=3, padx=5, pady=2)
+        tk.Button(btn_frame, text="SYSTEM", bg="#37474F", fg="white", command=self.system_menu, **btn_cfg).grid(row=0, column=3, padx=5, pady=2)
 
         tk.Button(btn_frame, text="SPEED v4", bg="#9C27B0", fg="white", command=self.run_iperf_v4, **btn_cfg).grid(row=1, column=0, padx=5, pady=2)
         tk.Button(btn_frame, text="PING v4", bg="#FF5722", fg="white", command=self.run_ping_v4, **btn_cfg).grid(row=1, column=1, padx=5, pady=2)
@@ -430,50 +433,110 @@ class AnalyzerApp:
             self.root.after(500, self.update_labels)
 
     # Written every 10 s by the ups-monitor service; stale means the service is down
-    def update_battery(self):
-        text, color = "Battery: --", "gray"
+    def battery_text(self):
         try:
             if time.time() - os.path.getmtime(UPS_STATUS) < 30:
                 with open(UPS_STATUS) as f:
                     fields = dict(re.findall(r"(\w+)=(\S+)", f.read()))
                 pct = int(fields["PCT"])
                 src = fields.get("SRC", "BAT")
-                if src == "BAT":
-                    mins = fields.get("MIN", "-")
-                    left = f" ~{int(mins) // 60}h{int(mins) % 60:02d}" if mins.isdigit() else ""
-                    text = f"Battery: {pct}%{left}"
-                    low = pct < 10 or fields.get("LOW", "0") != "0"
-                    color = "red" if low else "orange" if pct < 25 else "green"
-                else:
-                    text = f"Battery: {pct}% {'charging' if src == 'CHG' else 'AC'}"
-                    color = "darkgreen"
+                if src != "BAT":
+                    return f"{pct}% {'charging' if src == 'CHG' else 'AC'}", "darkgreen"
+                mins = fields.get("MIN", "-")
+                left = f" ~{int(mins) // 60}h{int(mins) % 60:02d}" if mins.isdigit() else ""
+                low = pct < 10 or fields.get("LOW", "0") != "0"
+                return f"{pct}%{left}", "red" if low else "orange" if pct < 25 else "green"
         except (OSError, KeyError, ValueError):
             pass
-        self.lbl_bat.config(text=text, fg=color)
+        return "--", "gray"
+
+    def update_battery(self):
+        text, color = self.battery_text()
+        self.lbl_bat.config(text=f"Battery: {text}", fg=color)
         self.root.after(5000, self.update_battery)
 
-    def power_menu(self):
-        if hasattr(self, 'power') and self.power.winfo_exists():
-            self.power.destroy()
+    def show_welcome(self):
+        bg = "#263238"
+        self.welcome = tk.Frame(self.root, bg=bg, cursor="none")
+        self.welcome.place(x=0, y=0, relwidth=1, relheight=1)
+        tk.Label(self.welcome, text="Portable Network Analyzer", font=('Arial', 28, 'bold'), fg="white", bg=bg).pack(pady=(45, 4))
+        tk.Label(self.welcome, text="Device for testing and monitoring networks", font=('Arial', 13), fg="#B0BEC5", bg=bg).pack()
+        info = tk.Frame(self.welcome, bg=bg)
+        info.pack(pady=22)
+        self.welcome_info = {}
+        for row, key in enumerate(("Battery", "Ports", "Wi-Fi")):
+            tk.Label(info, text=f"{key}:", font=('Arial', 13), fg="#90A4AE", bg=bg).grid(row=row, column=0, sticky="w", padx=(0, 12))
+            self.welcome_info[key] = tk.Label(info, text="...", font=('Arial', 13), fg="#ECEFF1", bg=bg)
+            self.welcome_info[key].grid(row=row, column=1, sticky="w")
+
+        btns = tk.Frame(self.welcome, bg=bg)
+        btns.pack()
+        cfg = {'fg': "white", 'width': 10}
+        tk.Button(btns, text="START", bg="#4CAF50", font=('Arial', 18, 'bold'), height=2, command=self.welcome.destroy, **cfg).pack(side=tk.LEFT, padx=8)
+        tk.Button(btns, text="WI-FI", bg="#0277BD", font=('Arial', 12, 'bold'), height=3, command=self.open_wifi, **cfg).pack(side=tk.LEFT, padx=8)
+        tk.Button(btns, text="POWER OFF", bg="#f44336", font=('Arial', 12, 'bold'), height=3, command=self.power_off, **cfg).pack(side=tk.LEFT, padx=8)
+
+        tk.Label(self.welcome, text="Mikhail Mukanov  |  V\u0160B - Technical University of Ostrava, FEI  |  2027",
+                 font=('Arial', 10), fg="#78909C", bg=bg).pack(side=tk.BOTTOM, pady=10)
+        self.update_welcome()
+
+    def update_welcome(self):
+        if not self.welcome.winfo_exists():
             return
 
-        self.power = tk.Toplevel(self.root)
-        self.power.title("Power")
-        self.power.geometry("360x205+220+140")
-        self.power.attributes('-topmost', True)
-        self.power.configure(bg="#ECEFF1", cursor="none")
+        def task():
+            ports = []
+            for cfg in self.PORTS.values():
+                r = subprocess.run(["sudo", "ip", "-n", cfg["ns"], "-br", "link", "show", cfg["iface"]], capture_output=True, text=True)
+                fields = r.stdout.split()
+                state = "not set up" if r.returncode != 0 or len(fields) < 2 else "link up" if fields[1] == "UP" else "no link"
+                ports.append(f"{cfg['iface']} {state}")
+            ssid, ip = wifi_status()
+            wifi = f"{ssid} ({ip or 'no IP'})" if ssid else "not connected"
+            values = {"Battery": self.battery_text()[0],
+                      "Ports": f"{', '.join(ports)}, DHCP/RA {'on' if self.dhcp_on else 'off'}",
+                      "Wi-Fi": wifi}
+            self.ui(self.show_welcome_info, values)
+
+        threading.Thread(target=task, daemon=True).start()
+        self.root.after(3000, self.update_welcome)
+
+    def show_welcome_info(self, values):
+        if self.welcome.winfo_exists():
+            for key, text in values.items():
+                self.welcome_info[key].config(text=text)
+
+    def system_menu(self):
+        if hasattr(self, 'menu') and self.menu.winfo_exists():
+            self.menu.destroy()
+            return
+
+        self.menu = tk.Toplevel(self.root)
+        self.menu.title("System")
+        self.menu.geometry("360x265+220+105")
+        self.menu.attributes('-topmost', True)
+        self.menu.configure(bg="#ECEFF1", cursor="none")
 
         cfg = {'font': ('Arial', 12, 'bold'), 'height': 2, 'width': 26}
-        tk.Button(self.power, text="POWER OFF", bg="#f44336", fg="white", command=self.power_off, **cfg).pack(padx=10, pady=(12, 5))
-        tk.Button(self.power, text="SERVICE MODE (DESKTOP)", bg="#607D8B", fg="white", command=lambda: self.close_app(SERVICE_EXIT), **cfg).pack(padx=10, pady=5)
-        tk.Button(self.power, text="CANCEL", command=self.power.destroy, **cfg).pack(padx=10, pady=5)
+        tk.Button(self.menu, text="WI-FI", bg="#0277BD", fg="white", command=self.open_wifi, **cfg).pack(padx=10, pady=(12, 5))
+        tk.Button(self.menu, text="POWER OFF", bg="#f44336", fg="white", command=self.power_off, **cfg).pack(padx=10, pady=5)
+        tk.Button(self.menu, text="SERVICE MODE (DESKTOP)", bg="#607D8B", fg="white", command=lambda: self.close_app(SERVICE_EXIT), **cfg).pack(padx=10, pady=5)
+        tk.Button(self.menu, text="CANCEL", command=self.menu.destroy, **cfg).pack(padx=10, pady=5)
+
+    def close_menu(self):
+        if hasattr(self, 'menu') and self.menu.winfo_exists():
+            self.menu.destroy()
+
+    def open_wifi(self):
+        self.close_menu()
+        WifiDialog(self.root, self.log)
 
     def stop_sniffer(self):
         self.is_monitoring = False
         if self.sniff_process: self.sniff_process.terminate()
 
     def power_off(self):
-        self.power.destroy()
+        self.close_menu()
         self.stop_sniffer()
         self.log("Shutting down...")
         subprocess.Popen(["sudo", "shutdown", "-h", "now"])
