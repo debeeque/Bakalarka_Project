@@ -176,7 +176,7 @@ class AnalyzerApp:
         except OSError as e:
             screen.set_verdict("FAIL", str(e)[:60])
             if on_done:
-                on_done(-1, "")
+                on_done(-1, "", False)
             return
         job = {"proc": proc, "label": label, "start": time.monotonic(), "screen": screen}
         self.jobs[port] = job
@@ -192,9 +192,9 @@ class AnalyzerApp:
             self.ui(finish, rc, "".join(lines))
 
         def finish(rc, out):
-            self.jobs.pop(port, None)
+            job = self.jobs.pop(port, None)
             if on_done:
-                on_done(rc, out)
+                on_done(rc, out, bool(job and job.get("stopped")))
 
         threading.Thread(target=reader, daemon=True).start()
 
@@ -209,6 +209,7 @@ class AnalyzerApp:
     def stop(self, port):
         job = self.jobs.get(port)
         if job:
+            job["stopped"] = True
             try:
                 job["proc"].send_signal(signal.SIGINT)
             except OSError:
@@ -309,6 +310,8 @@ class AnalyzerApp:
                        "ssid": self.ssid, "time": time.strftime("%H:%M"), "battery": self.battery_level()}
         if self.current in self.screens:
             self.screens[self.current].bar.draw(self.status)
+        if self.current == "HOME":
+            self.refresh_tiles()
         self.root.after(2000, self.tick)
 
     def wifi_tick(self):
@@ -346,12 +349,14 @@ class AnalyzerApp:
             self.welcome_info[key] = c.create_text(x + 68, y, text="...", font=('Arial', 11), fill="white", anchor="nw")
 
         self.btn_start = tk.Button(c, text="UNLOCK" if locked else "START", bg="#43A047", fg="white", bd=0,
-                                   activebackground="#2E7D32", font=('Arial', 18, 'bold'), command=self.unlock)
-        c.create_window(x, 240, window=self.btn_start, anchor="nw", width=300, height=60)
-        wifi = tk.Button(c, text="WI-FI", bg="#0277BD", fg="white", bd=0, font=('Arial', 12, 'bold'), command=self.open_wifi)
-        c.create_window(x, 312, window=wifi, anchor="nw", width=145, height=46)
-        off = tk.Button(c, text="POWER OFF", bg="#E53935", fg="white", bd=0, font=('Arial', 12, 'bold'), command=self.power_off)
-        c.create_window(x + 155, 312, window=off, anchor="nw", width=145, height=46)
+                                   activebackground="#2E7D32", activeforeground="white", font=('Arial', 18, 'bold'), command=self.unlock)
+        c.create_window(x, 232, window=self.btn_start, anchor="nw", width=300, height=70)
+        wifi = tk.Button(c, text="WI-FI", bg="#0277BD", fg="white", bd=0, activebackground="#0277BD", activeforeground="white", font=('Arial', 12, 'bold'), command=self.open_wifi)
+        c.create_window(x, 312, window=wifi, anchor="nw", width=145, height=60)
+        self.btn_off = tk.Button(c, text="POWER OFF", bg="#E53935", fg="white", bd=0, font=('Arial', 12, 'bold'),
+                                 activebackground="#E53935", activeforeground="white", command=self.welcome_power_off)
+        c.create_window(x + 155, 312, window=self.btn_off, anchor="nw", width=145, height=60)
+        self.off_armed = False
         c.create_text(12, 468, text="Mikhail Mukanov  |  2027", font=('Arial', 9), fill="#5E8A90", anchor="w")
         self.update_welcome(self.welcome_gen)
 
@@ -370,6 +375,19 @@ class AnalyzerApp:
         for key, text in values.items():
             self.welcome.itemconfig(self.welcome_info[key], text=text)
         self.root.after(3000, self.update_welcome, gen)
+
+    def welcome_power_off(self):
+        if self.off_armed:
+            self.power_off()
+            return
+        self.off_armed = True
+        self.btn_off.config(text="TAP AGAIN\nTO CONFIRM", bg=C["stop"], activebackground=C["stop"])
+        self.root.after(4000, self.welcome_disarm)
+
+    def welcome_disarm(self):
+        if self.off_armed and self.welcome is not None:
+            self.btn_off.config(text="POWER OFF", bg="#E53935", activebackground="#E53935")
+        self.off_armed = False
 
     def unlock(self):
         self.locked = False

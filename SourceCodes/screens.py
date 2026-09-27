@@ -17,9 +17,16 @@ class FunctionScreen(Screen):
         self.log("-" * 60)
         self.log("%s  %s" % (time.strftime("%H:%M:%S"), label))
         self.running(key, lambda: self.app.stop(port))
+        start = time.monotonic()
 
-        def done(rc, out):
+        # A stopped test has no valid result: the partial output would mislead the verdict
+        def done(rc, out, stopped):
             self.idle(key)
+            if stopped:
+                secs = int(time.monotonic() - start)
+                self.log("Stopped by user after %d s" % secs)
+                self.set_verdict("STOPPED", "by user after %d s on %s" % (secs, port))
+                return
             on_done(rc, out)
 
         self.app.run(port, cmd, label, self, on_line=self.log, on_done=done)
@@ -162,7 +169,9 @@ class ScanScreen(FunctionScreen):
         if not target:
             self.set_verdict("FAIL", "choose a target first")
             return
-        base = ["nmap", "-F", "-sV", "-T4", "--max-retries", "1", "--host-timeout", "30s", target]
+        # Nmap refuses an IPv6 literal without -6 and scans nothing
+        base = ["nmap"] + (["-6"] if ":" in target else []) + \
+               ["-F", "-sV", "-T4", "--max-retries", "1", "--host-timeout", "30s", target]
         if self.mode == "LAN":
             self.launch("nmap", self.netns(base), "Nmap %s on %s" % (target, self.port), self.nmap_done)
         else:
@@ -170,7 +179,9 @@ class ScanScreen(FunctionScreen):
 
     def nmap_done(self, rc, out):
         ports = re.findall(r"^(\d+/\w+)\s+open\s+(\S+)", out, re.M)
-        if "Host seems down" in out or "0 hosts up" in out:
+        if "Nmap done: 0 IP addresses" in out:
+            self.set_verdict("FAIL", "nothing scanned: %s is not a valid target" % self.app.scan_target)
+        elif "Host seems down" in out or "0 hosts up" in out:
             self.set_verdict("WARN", "host %s seems down" % self.app.scan_target)
         elif ports:
             self.set_verdict("INFO", "%d open: %s" % (len(ports), ", ".join(p for p, _ in ports[:4])))
