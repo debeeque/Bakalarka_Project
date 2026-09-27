@@ -69,6 +69,22 @@ FAKE_NETS = [{"ssid": "Benswagin", "signal": 94, "secure": True, "inuse": True},
              {"ssid": "cafe-free", "signal": 30, "secure": False, "inuse": False}]
 
 
+def fake_traffic(s):
+    feed = []
+    for i in range(12):
+        feed.append({"n": 100 + i, "ts": 1790520000.0 + i * 0.1, "cat": ["TCP", "UDP", "ICMPv6", "ARP"][i % 4],
+                     "len": 60 + i * 10, "src": "fd00:1::2e0:4cff:fe68:223", "dst": "fd00:1::10", "info": "5201",
+                     "detail": [["Frame", "#%d   12:00:00.100   98 B" % (100 + i)],
+                                ["Ethernet", "00:e0:4c:68:02:23 > 00:e0:4c:68:02:01   type 0x86dd IPv6"],
+                                ["IPv6", "fd00:1::2e0:4cff:fe68:223 > fd00:1::10"]]})
+    s.line("STATS " + __import__("json").dumps({
+        "t": 42.0, "packets": 1000, "bytes": 612000, "pps": 1284, "bps": 12600000, "avg": 612, "hosts": 6,
+        "cats": {"TCP": [712, 0], "UDP": [184, 0], "ICMP": [21, 0], "ICMPv6": [63, 0], "ARP": [9, 0], "other": [11, 0]},
+        "fam": {"4": 300, "6": 690}, "top": [["fd00:1::2e0:4cff:fe68:223", 18400000, 900], ["10.0.1.20", 6100000, 300]],
+        "ports": [], "feed": feed, "pcap": {"bytes": 0, "full": False}}))
+    s.app.screens["TRAFFIC"].draw()
+
+
 def rects(widget):
     out = []
     for w in widget.winfo_children():
@@ -110,7 +126,9 @@ def main():
             ("ipv6", "IPv6", lambda s: (s.select_port("snd0"), s.log(RA_LOG),
                                         s.set_verdict("PASS", "1 router, this device on snd0"))),
             ("path", "PATH", lambda s: s.set_verdict("PASS", "4/4 replies, avg 1.0 ms  ping v6, mon0")),
-            ("dhcp", "DHCP / RA", None), ("system", "SYSTEM", None)]
+            ("dhcp", "DHCP / RA", None), ("system", "SYSTEM", None),
+            ("traffic", "TRAFFIC", lambda s: fake_traffic(s)), ("paused", "PAUSED", None),
+            ("packet", "PACKET", None), ("filter", "FILTER", None), ("hosts", "HOSTS", None)]
 
     def step(i):
         if i == len(plan):

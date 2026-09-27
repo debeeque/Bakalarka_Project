@@ -147,8 +147,9 @@ class Screen(tk.Frame):
         if at_end:
             self.logbox.see("end")
 
-    def bottom(self, items):
-        """items: (key, text, color, command, base width); main buttons share the free width."""
+    def bottom(self, items, back=None):
+        """items: (key, text, color, command, base width); main buttons share the free width.
+        BACK goes home unless a sub-page passes its parent."""
         x = M
         if self.has_ports:
             for name in PORTS:
@@ -163,7 +164,7 @@ class Screen(tk.Frame):
             b.base = (text, color, command)
             self.actions[key] = b
             x += width + G
-        button(self, W - M - BACK_W, BTN_Y, BACK_W, BTN_H, "BACK", C["back"], self.app.home, "secondary", 17)
+        button(self, W - M - BACK_W, BTN_Y, BACK_W, BTN_H, "BACK", C["back"], back or self.app.home, "secondary", 17)
         if self.has_ports:
             self.select_port(self.port)
 

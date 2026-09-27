@@ -1,4 +1,5 @@
 import tkinter as tk
+import collections
 import json
 import os
 import re
@@ -12,6 +13,7 @@ from wifi_dialog import WifiDialog, wifi_status
 from ui_kit import C, G, H, M, PORTS, TOP, W, StatusBar, button, font
 from screens import (DhcpScreen, FunctionScreen, Ipv6Screen, KeypadScreen, PathScreen, ScanScreen, SpeedScreen,
                      SystemScreen, TargetScreen)
+from traffic import FilterScreen, HostScreen, PacketScreen, PausedScreen, TrafficScreen
 
 BASE_DIR = "/home/muk0015/diploma_project"
 UPS_STATUS = "/run/ups/status"
@@ -26,7 +28,7 @@ if os.path.exists(BASE_DIR):
 
 TILES = [
     ("AUTOTEST", "link, DHCP, IPv6, gateway, DNS, targets", "#1E88E5", None),
-    ("TRAFFIC", "live capture, protocols, top talkers, PCAP", "#00ACC1", None),
+    ("TRAFFIC", "live capture, protocols, top talkers, PCAP", "#00ACC1", TrafficScreen),
     ("GENERATOR", "ICMP, ICMPv6, UDP, TCP SYN, ARP, RS", "#00ACC1", None),
     ("SPEED", "iperf3 TCP, IPv4 and IPv6", "#1E88E5", SpeedScreen),
     ("PORT", "speed, duplex, partner modes, LLDP, VLAN", "#43A047", None),
@@ -38,7 +40,8 @@ TILES = [
     ("DHCP / RA", "serve addresses on the test ports", "#FB8C00", DhcpScreen),
     ("SYSTEM", "Wi-Fi, lock, desktop, power off", "#78909C", SystemScreen),
 ]
-PAGES = {"TARGET": TargetScreen, "KEYPAD": KeypadScreen}
+PAGES = {"TARGET": TargetScreen, "KEYPAD": KeypadScreen, "PAUSED": PausedScreen, "PACKET": PacketScreen,
+         "FILTER": FilterScreen, "HOSTS": HostScreen}
 
 
 class AnalyzerApp:
@@ -187,7 +190,8 @@ class AnalyzerApp:
 
     # --- running scripts, one job per port --------------------------------
 
-    def run(self, port, cmd, label, screen, on_line=None, on_done=None):
+    # keep: how many output lines to hold for on_done; a live capture must not grow without bound
+    def run(self, port, cmd, label, screen, on_line=None, on_done=None, keep=None):
         try:
             proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
                                     bufsize=1, start_new_session=True)
@@ -201,7 +205,7 @@ class AnalyzerApp:
         self.progress(port, job)
 
         def reader():
-            lines = []
+            lines = collections.deque(maxlen=keep)
             for line in proc.stdout:
                 lines.append(line)
                 if on_line:
