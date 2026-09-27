@@ -278,9 +278,12 @@ class SpeedScreen(FunctionScreen):
             c.create_text(x, 66, text=unit, font=font(14), fill=C["muted"], anchor="nw")
         if res.get("target"):
             thr = "throttled!" if res.get("throttled_now") else "no throttling"
-            line = "to %s %s (%s)   CPU %s %%   SoC %s %s %s C, %s" % (
-                res.get("peer") or "", short(res["target"]), res.get("source", "").split(" of ")[0], num(res.get("cpu_pct")),
-                num(res.get("temp_start")), RIGHT, num(res.get("temp_end")), thr)
+            tail = "   CPU %s %%   SoC %s %s %s C, %s" % (num(res.get("cpu_pct")), num(res.get("temp_start")), RIGHT,
+                                                          num(res.get("temp_end")), thr)
+            line = "to %s %s (%s)" % (res.get("peer") or "", short(res["target"]), res.get("source", "").split(" of ")[0])
+            if len(line + tail) > 92:
+                line = "to %s %s" % (res.get("peer") or "", short(res["target"]))
+            line += tail
             c.create_text(14, 100, text=line, font=font(14), fill=C["muted"], anchor="nw", width=W - 2 * M - 28)
         if live:
             total = TIMES[self.secs]

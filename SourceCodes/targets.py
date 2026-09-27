@@ -115,6 +115,19 @@ def ping_once(addr, family, iface):
     return subprocess.run(cmd, capture_output=True).returncode == 0
 
 
+# A lease or a cached neighbour may be hours old: resolve the address afresh; a host that blocks ping
+# still answers ARP or ND, which leaves the entry REACHABLE
+def alive(addr, family, iface):
+    subprocess.run(["ip", "-%d" % family, "neigh", "del", bare(addr), "dev", iface], capture_output=True)
+    if ping_once(addr, family, iface):
+        return True
+    try:
+        rows = json.loads(sh(["ip", "-j", "-%d" % family, "neigh", "show", "dev", iface]) or "[]")
+    except ValueError:
+        return False
+    return any(r.get("dst") == bare(addr) and "REACHABLE" in r.get("state", []) for r in rows)
+
+
 # One echo request to all nodes; replies come from link-local addresses
 def probe6(iface, secs=1):
     out = sh(["ping", "-6", "-n", "-i", "0.3", "-w", str(secs), "ff02::1%" + iface], timeout=secs + 5)
@@ -152,13 +165,14 @@ def resolve(iface, family, given=None):
         return str(ip) not in own and any(ip in n for n in nets)
 
     for addr, host in leases(iface, family):
-        if ours(addr):
+        if ours(addr) and alive(addr, family, iface):
             mac = mac_of(iface, family, addr)
             res.update(target=addr, source="DHCP lease" + (" of " + host if host else ""), mac=mac,
                        peer=host or peer_text(own_port(mac), mac))
             return res
     for addr, mac in neighbours(iface, family):
-        if not addr.lower().startswith("fe80") and ours(addr):
+        if not addr.lower().startswith("fe80") and ours(addr) and alive(addr, family, iface):
+            mac = mac_of(iface, family, addr) or mac
             res.update(target=addr, source="neighbour table", mac=mac, peer=peer_text(own_port(mac), mac))
             return res
 
@@ -167,7 +181,7 @@ def resolve(iface, family, given=None):
     own6 = {str(n.ip) for n in own_nets(iface, 6)}
     heard = probe6(iface) or [a for a, m in neighbours(iface, 6) if a.startswith("fe80") and a not in own6]
     for addr in heard:
-        if ping_once(addr, 6, iface):
+        if alive(addr, 6, iface):
             mac = mac_of(iface, 6, addr)
             peers.append((addr, mac, own_port(mac)))
     if family == 6 and peers:
