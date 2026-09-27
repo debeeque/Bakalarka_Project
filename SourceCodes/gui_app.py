@@ -1,14 +1,17 @@
 import tkinter as tk
-from tkinter import messagebox, scrolledtext
-import subprocess
+import json
 import os
+import re
+import signal
+import subprocess
 import sys
 import threading
-import re
 import time
-import json
 
 from wifi_dialog import WifiDialog, wifi_status
+from ui_kit import C, G, H, M, PORTS, TOP, W, StatusBar, button, font
+from screens import (DhcpScreen, Ipv6Screen, KeypadScreen, PathScreen, ScanScreen, SpeedScreen,
+                     SystemScreen, TargetScreen)
 
 BASE_DIR = "/home/muk0015/diploma_project"
 UPS_STATUS = "/run/ups/status"
@@ -21,33 +24,54 @@ SERVICE_EXIT = 3
 if os.path.exists(BASE_DIR):
     os.chdir(BASE_DIR)
 
+TILES = [
+    ("AUTOTEST", "link, DHCP, IPv6, gateway, DNS, targets", "#1E88E5", None),
+    ("TRAFFIC", "live capture, protocols, top talkers, PCAP", "#00ACC1", None),
+    ("GENERATOR", "ICMP, ICMPv6, UDP, TCP SYN, ARP, RS", "#00ACC1", None),
+    ("SPEED", "iperf3 TCP, IPv4 and IPv6", "#1E88E5", SpeedScreen),
+    ("PORT", "speed, duplex, partner modes, LLDP, VLAN", "#43A047", None),
+    ("SCAN", "ARP, IPv6 neighbours, Nmap", "#43A047", ScanScreen),
+    ("IPv6", "Router Advertisement audit", "#43A047", Ipv6Screen),
+    ("PATH", "ping IPv4 and IPv6", "#1E88E5", PathScreen),
+    ("WATCH", "periodic ping or TCP, history graph", "#1E88E5", None),
+    ("RESULTS", "saved tests, export to USB", "#78909C", None),
+    ("DHCP / RA", "serve addresses on the test ports", "#FB8C00", DhcpScreen),
+    ("SYSTEM", "Wi-Fi, lock, desktop, power off", "#78909C", SystemScreen),
+]
+PAGES = {"TARGET": TargetScreen, "KEYPAD": KeypadScreen}
+
+
 class AnalyzerApp:
     PORTS = {
-        "MONITOR": {"ns": "analyzer_monitor", "iface": "mon0", "net4": "10.0.1.0/24",
-                    "v4": "10.0.1.20", "v6": "fd00:1::20"},
-        "SENDER": {"ns": "analyzer_sender", "iface": "snd0", "net4": "10.0.2.0/24",
-                   "v4": "10.0.2.20", "v6": "fd00:2::20"},
+        "mon0": {"ns": "analyzer_monitor", "iface": "mon0", "net4": "10.0.1.0/24",
+                 "v4": "10.0.1.20", "v6": "fd00:1::20"},
+        "snd0": {"ns": "analyzer_sender", "iface": "snd0", "net4": "10.0.2.0/24",
+                 "v4": "10.0.2.20", "v6": "fd00:2::20"},
     }
 
     def __init__(self, root):
         self.root = root
         self.root.title("Portable Network Analyzer")
-        self.root.geometry("800x480")
+        self.root.geometry("%dx%d" % (W, H))
         # Kiosk mode: no title bar to hit on a resistive touchscreen
         self.root.attributes('-fullscreen', True)
-        self.root.config(cursor="none")
+        self.root.config(cursor="none", bg=C["bg"])
 
-        self.stats = {"TCP": 0, "UDP": 0, "ICMP": 0}
-        self.is_monitoring = False
-        self.sniff_process = None
-        self.test_running = False
         self.found = {}
+        self.scan_target = ""
+        self.jobs = {}
+        self.notes = {}
+        self.screens = {}
+        self.current = None
+        self.status = {}
+        self.ssid = self.wifi_ip = None
         self.welcome = self.catcher = self.wifi = None
         self.welcome_gen = 0
         self.locked = self.screen_off = False
         self.last_touch = time.monotonic()
 
-        self.setup_ui()
+        self.build_home()
+        self.home()
         self.show_welcome()
         self.root.bind_all("<ButtonPress>", self.touched, add="+")
         try:
@@ -56,139 +80,147 @@ class AnalyzerApp:
         except (OSError, subprocess.SubprocessError):
             pass
         self.root.after(5000, self.idle_check)
-
-    def setup_ui(self):
-        btn_frame = tk.Frame(self.root)
-        btn_frame.pack(side=tk.TOP, fill=tk.X, pady=5)
-        btn_cfg = {'font': ('Arial', 10, 'bold'), 'height': 2, 'width': 14}
-
-        self.btn_dhcp = tk.Button(btn_frame, fg="white", command=self.toggle_dhcp, **btn_cfg)
-        self.btn_dhcp.grid(row=0, column=0, padx=5, pady=2)
-        self.dhcp_on = self.port_state().get("dhcp", False)
-        self.show_dhcp()
-        tk.Button(btn_frame, text="2. ARP SCAN", bg="#2196F3", fg="white", command=self.run_arp_scan, **btn_cfg).grid(row=0, column=1, padx=5, pady=2)
-        self.btn_monitor = tk.Button(btn_frame, text="3. LIVE STATS", bg="#607D8B", fg="white", command=self.toggle_monitoring, **btn_cfg)
-        self.btn_monitor.grid(row=0, column=2, padx=5, pady=2)
-        tk.Button(btn_frame, text="SYSTEM", bg="#37474F", fg="white", command=self.system_menu, **btn_cfg).grid(row=0, column=3, padx=5, pady=2)
-
-        tk.Button(btn_frame, text="SPEED v4", bg="#9C27B0", fg="white", command=self.run_iperf_v4, **btn_cfg).grid(row=1, column=0, padx=5, pady=2)
-        tk.Button(btn_frame, text="PING v4", bg="#FF5722", fg="white", command=self.run_ping_v4, **btn_cfg).grid(row=1, column=1, padx=5, pady=2)
-        tk.Button(btn_frame, text="SPEED v6", bg="#6A1B9A", fg="white", command=self.run_iperf_v6, **btn_cfg).grid(row=1, column=2, padx=5, pady=2)
-        tk.Button(btn_frame, text="PING v6", bg="#E64A19", fg="white", command=self.run_ping_v6, **btn_cfg).grid(row=1, column=3, padx=5, pady=2)
-
-        # --- Security & Recon (NMAP) Section ---
-        sec_frame = tk.LabelFrame(self.root, text=" Security & Recon (Nmap) ", font=('Arial', 10, 'bold'), fg="darkred")
-        sec_frame.pack(fill=tk.X, padx=10, pady=2)
-
-        tk.Label(sec_frame, text="Target IP:", font=('Arial', 10)).pack(side=tk.LEFT, padx=5)
-        self.ip_entry = tk.Entry(sec_frame, font=('Arial', 11), width=15)
-        self.ip_entry.insert(0, "10.0.2.20")
-        self.ip_entry.pack(side=tk.LEFT, padx=5)
-        
-        tk.Button(sec_frame, text="DET", bg="#FFC107", font=('Arial', 9, 'bold'), pady=8, command=self.detect_gateway).pack(side=tk.LEFT, padx=2)
-
-        self.scan_mode = tk.StringVar(value="LAN")
-        tk.Radiobutton(sec_frame, text="LAN", variable=self.scan_mode, value="LAN", font=('Arial', 9), pady=8).pack(side=tk.LEFT, padx=2)
-        tk.Radiobutton(sec_frame, text="Wi-Fi", variable=self.scan_mode, value="WIFI", font=('Arial', 9), pady=8).pack(side=tk.LEFT, padx=2)
-
-        tk.Button(sec_frame, text="SCAN", bg="#333333", fg="white", font=('Arial', 9, 'bold'), pady=8, command=self.run_nmap, width=8).pack(side=tk.LEFT, padx=5)
-        
-        # Custom Numpad trigger
-        tk.Button(sec_frame, text="NUMPAD", bg="#009688", fg="white", font=('Arial', 9, 'bold'), pady=8, command=self.toggle_numpad).pack(side=tk.RIGHT, padx=5)
-
-        # --- IPv6 Audit and Target Discovery Section ---
-        ra_frame = tk.LabelFrame(self.root, text=" IPv6 Audit & Target Discovery ", font=('Arial', 10, 'bold'), fg="darkgreen")
-        ra_frame.pack(fill=tk.X, padx=10, pady=2)
-
-        tk.Label(ra_frame, text="Port:", font=('Arial', 10)).pack(side=tk.LEFT, padx=5)
-        self.ra_port = tk.StringVar(value="SENDER")
-        for key in ("MONITOR", "SENDER"):
-            tk.Radiobutton(ra_frame, text=f"{key.title()} {self.PORTS[key]['iface']}", variable=self.ra_port, value=key, font=('Arial', 9), pady=8).pack(side=tk.LEFT, padx=2)
-
-        tk.Button(ra_frame, text="RA SCAN", bg="#00695C", fg="white", font=('Arial', 9, 'bold'), pady=8, command=self.run_ra_audit, width=10).pack(side=tk.LEFT, padx=5)
-        tk.Button(ra_frame, text="NEIGHBORS", bg="#0277BD", fg="white", font=('Arial', 9, 'bold'), pady=8, command=self.run_neigh_scan, width=11).pack(side=tk.LEFT, padx=2)
-
-        # --- Dashboard Section ---
-        self.res_frame = tk.LabelFrame(self.root, text=" Intelligence Dashboard ", font=('Arial', 10, 'bold'), fg="darkblue")
-        self.res_frame.pack(fill=tk.X, padx=10, pady=2)
-
-        self.lbl_speed = tk.Label(self.res_frame, text="Speed: -- Mbps", font=('Arial', 12, 'bold'))
-        self.lbl_speed.pack(side=tk.LEFT, padx=20)
-        self.lbl_icmp = tk.Label(self.res_frame, text="Live ICMP/6: 0", font=('Arial', 12), fg="red")
-        self.lbl_icmp.pack(side=tk.LEFT, padx=20)
-        self.lbl_ra = tk.Label(self.res_frame, text="RA routers: --", font=('Arial', 12))
-        self.lbl_ra.pack(side=tk.LEFT, padx=20)
-        self.lbl_bat = tk.Label(self.res_frame, text="Battery: --", font=('Arial', 12, 'bold'), fg="gray")
-        self.lbl_bat.pack(side=tk.RIGHT, padx=10)
-        self.update_battery()
-
-        self.log_area = scrolledtext.ScrolledText(self.root, width=90, height=8, font=('Consolas', 9))
-        self.log_area.pack(padx=10, pady=5, fill=tk.BOTH, expand=True)
+        self.tick()
+        self.wifi_tick()
 
     # Tk widgets must only be touched from the main thread
     def ui(self, fn, *args, **kwargs):
         self.root.after(0, lambda: fn(*args, **kwargs))
 
-    def log(self, text):
-        self.ui(self._append_log, text)
+    # --- navigation -------------------------------------------------------
 
-    def _append_log(self, text):
-        self.log_area.insert(tk.END, f"{text}\n")
-        self.log_area.see(tk.END)
+    def build_home(self):
+        f = tk.Frame(self.root, bg=C["bg"], width=W, height=H, cursor="none")
+        f.bar = StatusBar(f, "NETWORK ANALYZER")
+        cols, rows = 4, 3
+        tw = (W - 2 * M - G * (cols - 1)) // cols
+        th = (H - M - TOP - G * (rows - 1)) // rows
+        f.tiles = {}
+        for i, (name, sub, accent, cls) in enumerate(TILES):
+            x = M + (i % cols) * (tw + G)
+            y = TOP + (i // cols) * (th + G)
+            f.tiles[name] = self.make_tile(f, x, y, tw, th, name, sub, accent, cls is not None)
+        self.screens["HOME"] = f
 
-    def detect_gateway(self):
-        try:
-            res = subprocess.run("ip route | grep default", shell=True, capture_output=True, text=True)
-            match = re.search(r"via ([\d\.]+)", res.stdout)
-            if match:
-                gw = match.group(1)
-                self.ip_entry.delete(0, tk.END)
-                self.ip_entry.insert(0, gw)
-                self.log(f"System: Detected Gateway {gw}")
-            else:
-                self.log("System: Gateway not found.")
-        except: pass
-
-    # --- Custom Numpad Implementation ---
-    def toggle_numpad(self):
-        if hasattr(self, 'numpad') and self.numpad.winfo_exists():
-            self.numpad.destroy()
-            return
-
-        self.numpad = tk.Toplevel(self.root)
-        self.numpad.title("IP Numpad")
-        self.numpad.geometry("240x300+540+150")
-        self.numpad.attributes('-topmost', True)
-        self.numpad.configure(bg="#ECEFF1")
-
-        keys = ['7', '8', '9', '4', '5', '6', '1', '2', '3', '0', '.', 'DEL']
-
-        row_idx, col_idx = 0, 0
-        for key in keys:
-            action = lambda x=key: self.numpad_press(x)
-            btn = tk.Button(self.numpad, text=key, font=('Arial', 16, 'bold'), command=action, height=2, width=4)
-            btn.grid(row=row_idx, column=col_idx, padx=5, pady=5)
-            col_idx += 1
-            if col_idx > 2:
-                col_idx = 0
-                row_idx += 1
-
-        tk.Button(self.numpad, text="CLEAR", font=('Arial', 12, 'bold'), bg="#f44336", fg="white", command=lambda: self.ip_entry.delete(0, tk.END), height=2).grid(row=row_idx, column=0, columnspan=2, padx=5, pady=5, sticky="we")
-        tk.Button(self.numpad, text="OK", font=('Arial', 12, 'bold'), bg="#4CAF50", fg="white", command=self.numpad.destroy, height=2).grid(row=row_idx, column=2, padx=5, pady=5, sticky="we")
-
-    def numpad_press(self, key):
-        if key == 'DEL':
-            current = self.ip_entry.get()
-            self.ip_entry.delete(0, tk.END)
-            self.ip_entry.insert(0, current[:-1])
+    def make_tile(self, parent, x, y, w, h, name, sub, accent, ready):
+        bg = C["panel"]
+        t = tk.Frame(parent, bg=bg, cursor="none")
+        t.place(x=x, y=y, width=w, height=h)
+        tk.Frame(t, bg=accent if ready else C["dim"]).place(x=0, y=0, width=6, relheight=1)
+        title = tk.Label(t, text=name, font=font(19, True), fg=C["text"] if ready else C["dim"], bg=bg, anchor="w")
+        title.place(x=16, y=10)
+        tk.Label(t, text=sub, font=font(14), fg=C["muted"] if ready else C["dim"], bg=bg, anchor="nw",
+                 justify="left", wraplength=w - 28).place(x=16, y=41)
+        line = tk.Frame(t, bg=bg)
+        line.place(x=16, y=h - 32)
+        t.word = tk.Label(line, font=font(16, True), bg=bg, fg=C["muted"])
+        t.word.pack(side="left")
+        t.rest = tk.Label(line, font=font(15), bg=bg, fg=C["muted"])
+        t.rest.pack(side="left")
+        t.role = "main"
+        if ready:
+            for wdg in (t, title, line, t.word, t.rest) + tuple(t.winfo_children()):
+                wdg.bind("<Button-1>", lambda e, n=name: self.open(n))
+            t.word.config(text="ready")
         else:
-            self.ip_entry.insert(tk.END, key)
+            t.word.config(text="not yet", fg=C["dim"])
+        return t
 
-    def netns_for(self, target):
-        t = target.strip().lower()
-        if t.startswith("10.0.1.") or t.startswith("fd00:1:"):
-            return "analyzer_monitor"
-        return "analyzer_sender"
+    def open(self, name):
+        if name not in self.screens:
+            cls = PAGES.get(name) or next(c for n, s, a, c in TILES if n == name)
+            s = cls(self)
+            self.screens[name] = s
+        self.show(name)
+
+    def home(self):
+        self.show("HOME")
+
+    def show(self, name):
+        s = self.screens[name]
+        s.place(x=0, y=0, width=W, height=H)
+        s.tkraise()
+        if self.welcome is not None:
+            self.welcome.tkraise()
+        for other, o in self.screens.items():
+            if other != name:
+                o.place_forget()
+        self.current = name
+        if name == "HOME":
+            self.refresh_tiles()
+        elif hasattr(s, "shown"):
+            s.shown()
+        s.bar.draw(self.status)
+
+    def note(self, tile, word, text, rest):
+        self.notes[tile] = (word, text, rest)
+
+    def refresh_tiles(self):
+        colors = {"PASS": "good", "OK": "good", "WARN": "warn", "FAIL": "bad", "INFO": "text", "ON": "warn",
+                  "OFF": "muted"}
+        st = self.port_state()
+        self.notes["DHCP / RA"] = ("ON", "", " serving") if st.get("dhcp") else ("OFF", "", " ports silent")
+        self.notes["SYSTEM"] = ("Wi-Fi", "", " " + self.ssid[:12]) if self.ssid else ("Wi-Fi", " off", "")
+        for name, (word, text, rest) in self.notes.items():
+            t = self.screens["HOME"].tiles.get(name)
+            if t is not None:
+                t.word.config(text=word + text, fg=C[colors.get(word, "text")])
+                t.rest.config(text=rest)
+
+    # --- running scripts, one job per port --------------------------------
+
+    def run(self, port, cmd, label, screen, on_line=None, on_done=None):
+        try:
+            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                                    bufsize=1, start_new_session=True)
+        except OSError as e:
+            screen.set_verdict("FAIL", str(e)[:60])
+            if on_done:
+                on_done(-1, "")
+            return
+        job = {"proc": proc, "label": label, "start": time.monotonic(), "screen": screen}
+        self.jobs[port] = job
+        self.progress(port, job)
+
+        def reader():
+            lines = []
+            for line in proc.stdout:
+                lines.append(line)
+                if on_line:
+                    self.ui(on_line, line)
+            rc = proc.wait()
+            self.ui(finish, rc, "".join(lines))
+
+        def finish(rc, out):
+            self.jobs.pop(port, None)
+            if on_done:
+                on_done(rc, out)
+
+        threading.Thread(target=reader, daemon=True).start()
+
+    def progress(self, port, job):
+        if self.jobs.get(port) is not job:
+            return
+        secs = int(time.monotonic() - job["start"])
+        job["screen"].set_verdict("RUNNING", "%s, %d s" % (job["label"], secs))
+        self.root.after(1000, self.progress, port, job)
+
+    # sudo relays SIGINT to the command, which prints its summary and exits
+    def stop(self, port):
+        job = self.jobs.get(port)
+        if job:
+            try:
+                job["proc"].send_signal(signal.SIGINT)
+            except OSError:
+                pass
+
+    # --- data for screens -------------------------------------------------
+
+    def target_for(self, port, family):
+        found = self.found.get(port, {}).get(family)
+        if found:
+            return found, "discovered"
+        return self.PORTS[port][family], "hardcoded fallback"
 
     # Written by analyzer-status.service on every link or address change
     def port_state(self):
@@ -204,277 +236,89 @@ class AnalyzerApp:
         ports = self.port_state().get("ports", {})
         return ",".join(p["mac"] for p in ports.values() if p.get("mac"))
 
-    def port_cfg(self):
-        return self.PORTS[self.ra_port.get()]
-
-    def target_for(self, cfg, family):
-        found = self.found.get(cfg["ns"], {}).get(family)
-        if found:
-            return found, "discovered"
-        return cfg[family], "hardcoded fallback"
-
-    def run_neigh_scan(self):
-        if self.test_running: return
-        cfg = self.port_cfg()
-        self.test_running = True
-        self.log(f"Discovery: enumerating IPv6 neighbours on {cfg['iface']} ({cfg['ns']})...")
-
-        def task():
-            base = ["sudo", "ip", "netns", "exec", cfg["ns"]]
-            cmd = base + ["python3", "neigh_scan.py", cfg["iface"]]
-            own = self.device_macs()
-            if own:
-                cmd += ["--own", own]
-
-            res = subprocess.run(cmd, capture_output=True, text=True)
-            self.log("-" * 30)
-            self.log(res.stdout.strip() if res.stdout.strip() else "No output.")
-            if res.stderr.strip():
-                self.log(res.stderr.strip())
-
-            arp = subprocess.run(base + ["python3", "arp_scan.py", cfg["iface"], cfg["net4"]],
-                                 capture_output=True, text=True)
-            self.log(arp.stdout.strip() if arp.stdout.strip() else "No ARP output.")
-            self.log("-" * 30)
-
-            store = self.found.setdefault(cfg["ns"], {})
-            m6 = re.search(r"^TARGET6\s+:\s+(\S+)", res.stdout, re.M)
-            if m6 and m6.group(1) != "none":
-                store["v6"] = m6.group(1)
-            m4 = re.search(r"^TARGET4:\s+(\S+)", arp.stdout, re.M)
-            if m4 and m4.group(1) != "none":
-                store["v4"] = m4.group(1)
-                self.ui(self.ip_entry.delete, 0, tk.END)
-                self.ui(self.ip_entry.insert, 0, store["v4"])
-
-            self.log(f"Discovery: targets for {cfg['ns']} -> "
-                     f"v4 {store.get('v4', 'none')}, v6 {store.get('v6', 'none')}")
-            self.test_running = False
-
-        threading.Thread(target=task, daemon=True).start()
-
-    def run_ra_audit(self):
-        if self.test_running: return
-        cfg = self.port_cfg()
-        ns, iface = cfg["ns"], cfg["iface"]
-        self.test_running = True
-        self.lbl_ra.config(text="RA routers: ...", fg="orange")
-        self.log(f"Audit: soliciting Router Advertisement on {iface} ({ns})...")
-
-        def task():
-            cmd = ["sudo", "ip", "netns", "exec", ns, "python3", "ra_audit.py", iface, "-t", "5"]
-            own = self.device_macs()
-            if own:
-                cmd += ["--own", own]
-
-            res = subprocess.run(cmd, capture_output=True, text=True)
-            self.log("-" * 30)
-            self.log(res.stdout.strip() if res.stdout.strip() else "No output.")
-            if res.stderr.strip():
-                self.log(res.stderr.strip())
-            self.log("-" * 30)
-
-            match = re.search(r"^Routers\s+:\s+(\d+)", res.stdout, re.M)
-            total = int(match.group(1)) if match else 0
-            foreign = res.stdout.count("[FOREIGN]")
-            if foreign:
-                self.ui(self.lbl_ra.config, text=f"RA routers: {total} (foreign {foreign})", fg="red")
-            elif total:
-                self.ui(self.lbl_ra.config, text=f"RA routers: {total}", fg="green")
-            else:
-                self.ui(self.lbl_ra.config, text="RA routers: none", fg="black")
-            self.test_running = False
-
-        threading.Thread(target=task, daemon=True).start()
-
-    def run_nmap(self):
-        if self.test_running: return
-        target = self.ip_entry.get().strip()
-        if not target:
-            self.log("Error: Please enter a target IP.")
-            return
-
-        mode = self.scan_mode.get()
-        self.test_running = True
-        self.log(f"Recon: Starting FAST Nmap scan against {target} ({mode})...")
-
-        def task():
-            base_nmap = ["nmap", "-F", "-sV", "-T4", "--max-retries", "1", "--host-timeout", "30s", target]
-            
-            if mode == "LAN":
-                ns = self.netns_for(target)
-                self.log(f"Recon: using namespace {ns}")
-                cmd = ["sudo", "ip", "netns", "exec", ns] + base_nmap
-            else:
-                cmd = ["sudo"] + base_nmap
-
-            res = subprocess.run(cmd, capture_output=True, text=True)
-            self.log("-" * 30)
-            self.log(f"NMAP RESULTS ({mode}):")
-            if res.stdout:
-                self.log(res.stdout)
-            else:
-                self.log("No response or scan timed out.")
-            self.log("-" * 30)
-            self.test_running = False
-
-        threading.Thread(target=task, daemon=True).start()
-
-    # Ports are set up at boot by analyzer-ports.service; serving DHCP and RA
-    # is opt-in, so the device is safe to plug into a foreign network
-    def show_dhcp(self):
-        if self.dhcp_on:
-            self.btn_dhcp.config(text="1. DHCP: ON", bg="#4CAF50")
-        else:
-            self.btn_dhcp.config(text="1. DHCP: OFF", bg="#9E9E9E")
-
-    def toggle_dhcp(self):
-        mode = "nodhcp" if self.dhcp_on else "dhcp"
-        self.log(f"System: {'stopping' if self.dhcp_on else 'starting'} DHCP and RA on both ports...")
-
-        def task():
-            r = subprocess.run(["sudo", "./setup_network.sh", mode], capture_output=True, text=True)
-            out = (r.stdout + r.stderr).strip()
-            if r.returncode == 0:
-                self.dhcp_on = mode == "dhcp"
-                self.log(f"[OK] {out}")
-            else:
-                self.log(f"[FAIL] setup_network.sh {mode}: {out}")
-            self.ui(self.show_dhcp)
-
-        threading.Thread(target=task, daemon=True).start()
-
-    def execute_iperf(self, target, proto_name, ns=None):
-        if self.test_running: return
-        self.log(f"Test: Running throughput test to {target} ({proto_name})...")
-        self.lbl_speed.config(text="Testing...", fg="orange")
-        self.test_running = True
-
-        def task():
-            cmd = ["sudo", "ip", "netns", "exec", ns or self.netns_for(target), "iperf3", "-c", target, "-t", "5"]
-            res = subprocess.run(cmd, capture_output=True, text=True)
-            
-            if "error" in res.stderr or "error" in res.stdout:
-                self.log(res.stderr if res.stderr else res.stdout)
-
-            match = re.findall(r"([\d\.]+)\s+Mbits/sec\s+receiver", res.stdout)
-            if not match: match = re.findall(r"([\d\.]+)\s+Mbits/sec", res.stdout)
-
-            if match:
-                mbps = match[-1]
-                self.ui(self.lbl_speed.config, text=f"Speed: {mbps} Mbps", fg="green")
-                self.log(f"[SUCCESS] {proto_name} Bandwidth: {mbps} Mbps")
-            else:
-                self.ui(self.lbl_speed.config, text="Fail", fg="red")
-            self.test_running = False
-
-        threading.Thread(target=task, daemon=True).start()
-
-    def run_iperf_v4(self):
-        cfg = self.port_cfg()
-        target, source = self.target_for(cfg, "v4")
-        self.log(f"Target: {target} ({source})")
-        self.execute_iperf(target, "IPv4", ns=cfg["ns"])
-
-    def run_iperf_v6(self):
-        cfg = self.port_cfg()
-        target, source = self.target_for(cfg, "v6")
-        self.log(f"Target: {target} ({source})")
-        self.execute_iperf(target, "IPv6", ns=cfg["ns"])
-
-    def execute_ping(self, target, is_ipv6=False, ns=None):
-        if self.test_running: return
-        proto = "IPv6" if is_ipv6 else "IPv4"
-        self.log(f"Test: Measuring {proto} latency to {target}...")
-        self.test_running = True
-
-        def task():
-            ping_cmd = "ping" if not is_ipv6 else "ping6"
-            cmd = ["sudo", "ip", "netns", "exec", ns or self.netns_for(target), ping_cmd, target, "-c", "4"]
-            res = subprocess.run(cmd, capture_output=True, text=True)
-            self.log("-" * 20)
-            self.log(res.stdout)
-
-            if res.returncode == 0:
-                self.log(f"[SUCCESS] {proto} Target is reachable.")
-            else:
-                self.log(f"[FAILED] No response from {proto} target.")
-            self.test_running = False
-
-        threading.Thread(target=task, daemon=True).start()
-
-    def run_ping_v4(self):
-        cfg = self.port_cfg()
-        target, source = self.target_for(cfg, "v4")
-        self.log(f"Target: {target} ({source})")
-        self.execute_ping(target, is_ipv6=False, ns=cfg["ns"])
-
-    def run_ping_v6(self):
-        cfg = self.port_cfg()
-        target, source = self.target_for(cfg, "v6")
-        self.log(f"Target: {target} ({source})")
-        self.execute_ping(target, is_ipv6=True, ns=cfg["ns"])
-
-    def run_arp_scan(self):
-        cfg = self.port_cfg()
-        self.log(f"Scan: ARP sweep of {cfg['net4']} on {cfg['iface']} ({cfg['ns']})...")
-        cmd = ["sudo", "ip", "netns", "exec", cfg["ns"], "python3", "arp_scan.py", cfg["iface"], cfg["net4"]]
-        res = subprocess.run(cmd, capture_output=True, text=True)
-        self.log(res.stdout)
-
-    def toggle_monitoring(self):
-        if not self.is_monitoring:
-            self.is_monitoring = True
-            self.btn_monitor.config(text="STOP STATS", bg="#FF9800")
-            self.log(f"Monitor: Passive capture on {self.PORTS['MONITOR']['iface']} (IPv4/v6)...")
-            self.stats = {"TCP": 0, "UDP": 0, "ICMP": 0}
-            threading.Thread(target=self.packet_sniff_thread, daemon=True).start()
-            self.update_labels()
-        else:
-            self.is_monitoring = False
-            self.btn_monitor.config(text="3. LIVE STATS", bg="#607D8B")
-            if self.sniff_process: self.sniff_process.terminate()
-
-    def packet_sniff_thread(self):
-        cfg = self.PORTS["MONITOR"]
-        cmd = ["sudo", "ip", "netns", "exec", cfg["ns"], "tcpdump", "-i", cfg["iface"], "-n", "-l"]
+    def wifi_gateway(self):
         try:
-            self.sniff_process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
-            for line in self.sniff_process.stdout:
-                if not self.is_monitoring: break
-                l = line.upper()
-                if "ICMP" in l or "ICMP6" in l: self.stats["ICMP"] += 1
-                elif "TCP" in l: self.stats["TCP"] += 1
-                elif "UDP" in l: self.stats["UDP"] += 1
-        except: pass
-
-    def update_labels(self):
-        if self.is_monitoring:
-            self.lbl_icmp.config(text=f"Live ICMP/6: {self.stats['ICMP']}")
-            self.root.after(500, self.update_labels)
+            out = subprocess.run(["ip", "route", "show", "default"], capture_output=True, text=True, timeout=3).stdout
+        except (OSError, subprocess.SubprocessError):
+            return None
+        m = re.search(r"via (\S+)", out)
+        return m.group(1) if m else None
 
     # Written every 10 s by the ups-monitor service; stale means the service is down
-    def battery_text(self):
+    def ups(self):
         try:
             if time.time() - os.path.getmtime(UPS_STATUS) < 30:
                 with open(UPS_STATUS) as f:
-                    fields = dict(re.findall(r"(\w+)=(\S+)", f.read()))
-                pct = int(fields["PCT"])
-                src = fields.get("SRC", "BAT")
-                if src != "BAT":
-                    return f"{pct}% {'charging' if src == 'CHG' else 'AC'}", "darkgreen"
-                mins = fields.get("MIN", "-")
-                left = f" ~{int(mins) // 60}h{int(mins) % 60:02d}" if mins.isdigit() else ""
-                low = pct < 10 or fields.get("LOW", "0") != "0"
-                return f"{pct}%{left}", "red" if low else "orange" if pct < 25 else "green"
-        except (OSError, KeyError, ValueError):
+                    return dict(re.findall(r"(\w+)=(\S+)", f.read()))
+        except OSError:
             pass
-        return "--", "gray"
+        return {}
 
-    def update_battery(self):
-        text, color = self.battery_text()
-        self.lbl_bat.config(text=f"Battery: {text}", fg=color)
-        self.root.after(5000, self.update_battery)
+    def battery_text(self):
+        fields = self.ups()
+        try:
+            pct = int(fields["PCT"])
+            src = fields.get("SRC", "BAT")
+            if src != "BAT":
+                return f"{pct}% {'charging' if src == 'CHG' else 'AC'}", "darkgreen"
+            mins = fields.get("MIN", "-")
+            left = f" ~{int(mins) // 60}h{int(mins) % 60:02d}" if mins.isdigit() else ""
+            low = pct < 10 or fields.get("LOW", "0") != "0"
+            return f"{pct}%{left}", "red" if low else "orange" if pct < 25 else "green"
+        except (KeyError, ValueError):
+            return "--", "gray"
+
+    def battery_level(self):
+        fields = self.ups()
+        try:
+            pct = int(fields["PCT"])
+        except (KeyError, ValueError):
+            return None, C["dim"]
+        if fields.get("SRC") != "BAT":
+            return pct, C["good"]
+        return pct, C["bad"] if pct < 10 else C["warn"] if pct < 25 else C["good"]
+
+    def system_info(self):
+        ups = self.ups()
+        rows = [("Wi-Fi", "%s, %s" % (self.ssid, self.wifi_ip or "no IP") if self.ssid else "not connected")]
+        if ups:
+            rows.append(("Battery", "%s %%, %s V, %s A, %s" % (ups.get("PCT"), ups.get("V"), ups.get("I", "").lstrip("-"),
+                                                              {"CHG": "charging", "AC": "on charger"}.get(ups.get("SRC"), "on battery"))))
+        try:
+            temp = subprocess.run(["vcgencmd", "measure_temp"], capture_output=True, text=True, timeout=3).stdout
+            thr = subprocess.run(["vcgencmd", "get_throttled"], capture_output=True, text=True, timeout=3).stdout
+            rows.append(("SoC", "%s, %s" % (temp.strip().replace("temp=", ""), thr.strip())))
+        except (OSError, subprocess.SubprocessError):
+            pass
+        with open("/proc/uptime") as f:
+            up = int(float(f.read().split()[0]))
+        rows.append(("Uptime", "%d h %02d min" % (up // 3600, up % 3600 // 60)))
+        rows.append(("Clock", time.strftime("%d.%m.%Y %H:%M %Z")))
+        st = self.port_state()
+        for port in PORTS:
+            p = st.get("ports", {}).get(port, {})
+            if p.get("present"):
+                rows.append((port, "%s, %s" % (p.get("mac"), ", ".join(p.get("addr4", [])) or "no IPv4")))
+            else:
+                rows.append((port, "adapter not plugged in"))
+        return rows
+
+    def tick(self):
+        st = self.port_state()
+        self.status = {"ports": st.get("ports", {}), "dhcp": st.get("dhcp", False),
+                       "ssid": self.ssid, "time": time.strftime("%H:%M"), "battery": self.battery_level()}
+        if self.current in self.screens:
+            self.screens[self.current].bar.draw(self.status)
+        self.root.after(2000, self.tick)
+
+    def wifi_tick(self):
+        def task():
+            ssid, ip = wifi_status()
+            self.ssid, self.wifi_ip = ssid, ip
+        threading.Thread(target=task, daemon=True).start()
+        self.root.after(10000, self.wifi_tick)
+
+    # --- welcome and lock screen ------------------------------------------
 
     # Welcome screen doubles as the lock screen; drawn on a canvas so text sits on the wallpaper
     def show_welcome(self, locked=False):
@@ -514,30 +358,18 @@ class AnalyzerApp:
     def update_welcome(self, gen):
         if gen != self.welcome_gen or self.welcome is None:
             return
-
-        def task():
-            state = self.port_state()
-            ports = []
-            for cfg in self.PORTS.values():
-                p = state.get("ports", {}).get(cfg["iface"], {})
-                text = "absent" if not p.get("present") else f"{p['speed']}" if p.get("carrier") and p.get("speed") else "no link"
-                ports.append(f"{cfg['iface']} {text}")
-            if state:
-                self.dhcp_on = state.get("dhcp", False)
-                self.ui(self.show_dhcp)
-            ssid, ip = wifi_status()
-            values = {"Battery": self.battery_text()[0],
-                      "Ports": f"{', '.join(ports)}, DHCP {'on' if self.dhcp_on else 'off'}",
-                      "Wi-Fi": f"{ssid} ({ip or 'no IP'})" if ssid else "not connected"}
-            self.ui(self.show_welcome_info, gen, values)
-
-        threading.Thread(target=task, daemon=True).start()
+        state = self.port_state()
+        ports = []
+        for port in PORTS:
+            p = state.get("ports", {}).get(port, {})
+            text = "absent" if not p.get("present") else f"{p['speed']}" if p.get("carrier") and p.get("speed") else "no link"
+            ports.append(f"{port} {text}")
+        values = {"Battery": self.battery_text()[0],
+                  "Ports": f"{', '.join(ports)}, DHCP {'on' if state.get('dhcp') else 'off'}",
+                  "Wi-Fi": f"{self.ssid} ({self.wifi_ip or 'no IP'})" if self.ssid else "not connected"}
+        for key, text in values.items():
+            self.welcome.itemconfig(self.welcome_info[key], text=text)
         self.root.after(3000, self.update_welcome, gen)
-
-    def show_welcome_info(self, gen, values):
-        if gen == self.welcome_gen and self.welcome is not None:
-            for key, text in values.items():
-                self.welcome.itemconfig(self.welcome_info[key], text=text)
 
     def unlock(self):
         self.locked = False
@@ -559,10 +391,8 @@ class AnalyzerApp:
         self.root.after(5000, self.idle_check)
 
     def lock(self):
-        self.close_menu()
-        for win in (getattr(self, 'numpad', None), self.wifi.win if self.wifi else None):
-            if win is not None and win.winfo_exists():
-                win.destroy()
+        if self.wifi and self.wifi.win.winfo_exists():
+            self.wifi.win.destroy()
         self.locked = True
         self.show_welcome(locked=True)
         self.display(False)
@@ -583,46 +413,27 @@ class AnalyzerApp:
         except (OSError, subprocess.SubprocessError):
             pass
 
-    def system_menu(self):
-        if hasattr(self, 'menu') and self.menu.winfo_exists():
-            self.menu.destroy()
-            return
-
-        self.menu = tk.Toplevel(self.root)
-        self.menu.title("System")
-        self.menu.geometry("360x325+220+75")
-        self.menu.attributes('-topmost', True)
-        self.menu.configure(bg="#ECEFF1", cursor="none")
-
-        cfg = {'font': ('Arial', 12, 'bold'), 'height': 2, 'width': 26}
-        tk.Button(self.menu, text="LOCK SCREEN", bg="#37474F", fg="white", command=self.lock, **cfg).pack(padx=10, pady=(12, 5))
-        tk.Button(self.menu, text="WI-FI", bg="#0277BD", fg="white", command=self.open_wifi, **cfg).pack(padx=10, pady=5)
-        tk.Button(self.menu, text="POWER OFF", bg="#f44336", fg="white", command=self.power_off, **cfg).pack(padx=10, pady=5)
-        tk.Button(self.menu, text="SERVICE MODE (DESKTOP)", bg="#607D8B", fg="white", command=lambda: self.close_app(SERVICE_EXIT), **cfg).pack(padx=10, pady=5)
-        tk.Button(self.menu, text="CANCEL", command=self.menu.destroy, **cfg).pack(padx=10, pady=5)
-
-    def close_menu(self):
-        if hasattr(self, 'menu') and self.menu.winfo_exists():
-            self.menu.destroy()
+    # --- system -----------------------------------------------------------
 
     def open_wifi(self):
-        self.close_menu()
-        self.wifi = WifiDialog(self.root, self.log)
+        self.wifi = WifiDialog(self.root, print)
 
-    def stop_sniffer(self):
-        self.is_monitoring = False
-        if self.sniff_process: self.sniff_process.terminate()
+    def stop_all(self):
+        for port in list(self.jobs):
+            self.stop(port)
 
     def power_off(self):
-        self.close_menu()
-        self.stop_sniffer()
-        self.log("Shutting down...")
+        self.stop_all()
         subprocess.Popen(["sudo", "shutdown", "-h", "now"])
 
+    def service_mode(self):
+        self.close_app(SERVICE_EXIT)
+
     def close_app(self, code=0):
-        self.stop_sniffer()
+        self.stop_all()
         self.root.destroy()
         sys.exit(code)
+
 
 if __name__ == "__main__":
     root = tk.Tk()
