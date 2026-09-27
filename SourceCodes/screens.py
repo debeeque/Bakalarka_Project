@@ -345,6 +345,7 @@ class SystemScreen(Screen):
         self.bottom([("wifi", "WI-FI", "#0277BD", app.open_wifi, 110),
                      ("lock", "LOCK", C["gray"], app.lock, 100),
                      ("service", "DESKTOP", "#546E7A", app.service_mode, 110),
+                     ("clear", "CLEAR\nRESULTS", C["action"], self.clear_results, 110),
                      ("off", "POWER\nOFF", "#E53935", self.power_off, 110)])
         self.armed = False
 
@@ -358,6 +359,10 @@ class SystemScreen(Screen):
         for i, (k, v) in enumerate(rows):
             c.create_text(14, 20 + i * 32, text=k, font=font(17), fill=C["muted"], anchor="w")
             c.create_text(190, 20 + i * 32, text=v, font=font(17), fill=C["text"], anchor="w")
+
+    def clear_results(self):
+        kept = self.app.clear_results()
+        self.set_verdict("OK", "results cleared" + (", %d running test kept" % kept if kept else ""))
 
     def power_off(self):
         if self.armed:

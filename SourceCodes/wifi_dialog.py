@@ -3,8 +3,10 @@ import subprocess
 import threading
 import tkinter as tk
 
-FONT = 'Arial'
-BG = "#ECEFF1"
+from ui_kit import (BACK_W, BAR_H, BOTTOM, BTN_H, BTN_Y, C, DOT, DOWN, G, H, M, MID, SIDE_W, TOP, UP, VERDICT,
+                    VERDICT_H, W, button, font)
+
+BODY = TOP + VERDICT_H + G
 
 
 def nmcli(*args, timeout=45):
@@ -67,41 +69,34 @@ def saved_profiles():
     return profiles
 
 
-class OnScreenKeyboard(tk.Frame):
+class OnScreenKeyboard:
+    """Character keys in a rectangle; SHIFT, layout, space and delete are separate calls for a bottom bar."""
     LAYOUTS = {
         "abc": ["1234567890", "qwertyuiop", "asdfghjkl", "zxcvbnm"],
         "sym": ["1234567890", "!@#$%^&*()", "-_=+[]{}\\|~", ";:'\",.<>/?`"],
     }
-    KEY_W, KEY_H = 66, 50
 
-    def __init__(self, parent, entry):
-        super().__init__(parent, bg=BG)
-        self.entry = entry
-        self.layout = "abc"
-        self.caps = False
+    def __init__(self, parent, x, y, w, h, on_key):
+        self.parent, self.box, self.on_key = parent, (x, y, w, h), on_key
+        self.layout, self.caps, self.keys = "abc", False, []
         self.build()
 
-    def key(self, row, text, width, cmd, bg="#FAFAFA"):
-        f = tk.Frame(row, width=width, height=self.KEY_H)
-        f.pack_propagate(False)
-        f.pack(side=tk.LEFT, padx=2, pady=2)
-        tk.Button(f, text=text, font=(FONT, 14, 'bold'), bg=bg, command=cmd).pack(fill=tk.BOTH, expand=True)
-
     def build(self):
-        for w in self.winfo_children():
-            w.destroy()
-        for chars in self.LAYOUTS[self.layout]:
-            row = tk.Frame(self, bg=BG)
-            row.pack()
+        for b in self.keys:
+            b.destroy()
+        self.keys = []
+        x0, y0, w, h = self.box
+        rows = self.LAYOUTS[self.layout]
+        gap = G
+        kh = (h - gap * (len(rows) - 1)) // len(rows)
+        kw = (w - gap * 10) // 11
+        for r, chars in enumerate(rows):
+            x = x0 + (w - len(chars) * kw - (len(chars) - 1) * gap) // 2
             for ch in chars:
                 ch = ch.upper() if self.caps else ch
-                self.key(row, ch, self.KEY_W, lambda c=ch: self.entry.insert(tk.END, c))
-        row = tk.Frame(self, bg=BG)
-        row.pack()
-        self.key(row, "SHIFT", 110, self.toggle_caps, "#90CAF9" if self.caps else "#CFD8DC")
-        self.key(row, "?123" if self.layout == "abc" else "abc", 110, self.toggle_layout, "#CFD8DC")
-        self.key(row, "SPACE", 300, lambda: self.entry.insert(tk.END, " "))
-        self.key(row, "DEL", 130, self.backspace, "#FFCDD2")
+                self.keys.append(button(self.parent, x, y0 + r * (kh + gap), kw, kh, ch, C["panel2"],
+                                        lambda c=ch: self.on_key(c), "secondary", 22))
+                x += kw + gap
 
     def toggle_caps(self):
         self.caps = not self.caps
@@ -111,95 +106,28 @@ class OnScreenKeyboard(tk.Frame):
         self.layout = "sym" if self.layout == "abc" else "abc"
         self.build()
 
-    def backspace(self):
-        text = self.entry.get()
-        self.entry.delete(0, tk.END)
-        self.entry.insert(0, text[:-1])
-
-
-class NetworkList(tk.Frame):
-    ROW_H = 54
-    ROW_BG, SEL_BG = "white", "#BBDEFB"
-
-    def __init__(self, parent):
-        super().__init__(parent, bg=BG)
-        self.canvas = tk.Canvas(self, bg=self.ROW_BG, highlightthickness=0)
-        bar = tk.Scrollbar(self, command=self.canvas.yview, width=30)
-        self.canvas.config(yscrollcommand=bar.set)
-        bar.pack(side=tk.RIGHT, fill=tk.Y)
-        self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        self.inner = tk.Frame(self.canvas, bg=self.ROW_BG)
-        item = self.canvas.create_window(0, 0, window=self.inner, anchor="nw")
-        self.inner.bind("<Configure>", lambda e: self.canvas.config(scrollregion=self.canvas.bbox("all")))
-        self.canvas.bind("<Configure>", lambda e: self.canvas.itemconfig(item, width=e.width))
-        self.rows, self.selected = [], None
-
-    def set(self, nets, profiles):
-        for w in self.inner.winfo_children():
-            w.destroy()
-        self.rows, self.selected = [], None
-        for i, n in enumerate(nets):
-            self.rows.append(self.make_row(i, n, n["ssid"] in profiles))
-        self.canvas.yview_moveto(0)
-
-    def make_row(self, i, net, saved):
-        row = tk.Frame(self.inner, bg=self.ROW_BG, height=self.ROW_H)
-        row.pack(fill=tk.X)
-        row.pack_propagate(False)
-        tk.Frame(self.inner, bg="#CFD8DC", height=1).pack(fill=tk.X)
-
-        bars = tk.Canvas(row, width=36, height=30, bg=self.ROW_BG, highlightthickness=0)
-        level = min(4, (net["signal"] + 24) // 25)
-        for b in range(4):
-            h = 8 + b * 7
-            bars.create_rectangle(b * 9, 30 - h, b * 9 + 6, 30, width=0,
-                                  fill="#0277BD" if b < level else "#CFD8DC")
-        bars.pack(side=tk.RIGHT, padx=(4, 12))
-        pct = tk.Label(row, text=f"{net['signal']}%", font=(FONT, 12), fg="#546E7A", bg=self.ROW_BG, width=4, anchor="e")
-        pct.pack(side=tk.RIGHT)
-
-        text = tk.Frame(row, bg=self.ROW_BG)
-        text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=12)
-        name = tk.Label(text, text=net["ssid"], font=(FONT, 15, 'bold'), anchor="w", bg=self.ROW_BG,
-                        fg="#2E7D32" if net["inuse"] else "black")
-        name.pack(fill=tk.X, pady=(5, 0))
-        tags = (["connected"] if net["inuse"] else []) + (["saved"] if saved else []) + \
-               ["secured" if net["secure"] else "open"]
-        info = tk.Label(text, text="  \u00b7  ".join(tags), font=(FONT, 10), fg="#78909C", anchor="w", bg=self.ROW_BG)
-        info.pack(fill=tk.X)
-
-        widgets = (row, bars, pct, text, name, info)
-        for w in widgets:
-            w.bind("<Button-1>", lambda e, k=i: self.select(k))
-        return widgets
-
-    def select(self, i):
-        self.selected = i
-        for k, widgets in enumerate(self.rows):
-            for w in widgets:
-                w.config(bg=self.SEL_BG if k == i else self.ROW_BG)
-
 
 class WifiDialog:
+    PER_PAGE = 4
+
     def __init__(self, root, log=print, on_close=None):
         self.root, self.log, self.on_close = root, log, on_close
         self.nets, self.profiles = [], {}
+        self.page_no, self.selected = 0, None
+        self.password, self.show_pw, self.net = "", False, None
+        self.widgets = []
 
         self.win = tk.Toplevel(root)
         self.win.title("Wi-Fi")
-        self.win.geometry("800x480+0+0")
+        self.win.geometry("%dx%d+0+0" % (W, H))
         self.win.attributes('-topmost', True)
-        self.win.configure(bg=BG, cursor="none")
-
-        top = tk.Frame(self.win, bg=BG)
-        top.pack(fill=tk.X, padx=8, pady=6)
-        self.status = tk.Label(top, text="Wi-Fi", font=(FONT, 13, 'bold'), bg=BG, anchor="w")
-        self.status.pack(side=tk.LEFT, fill=tk.X, expand=True)
-        tk.Button(top, text="CLOSE", font=(FONT, 11, 'bold'), bg="#f44336", fg="white",
-                  height=2, width=9, command=self.close).pack(side=tk.RIGHT)
-
-        self.page = tk.Frame(self.win, bg=BG)
-        self.page.pack(fill=tk.BOTH, expand=True)
+        self.win.configure(bg=C["bg"], cursor="none")
+        bar = tk.Canvas(self.win, width=W, height=BAR_H, bg=C["bar"], highlightthickness=0, cursor="none")
+        bar.place(x=0, y=0)
+        bar.create_text(M, BAR_H // 2 + 1, text="WI-FI", font=font(17, True), fill=C["text"], anchor="w")
+        self.verdict = tk.Canvas(self.win, width=W - 2 * M, height=VERDICT_H, bg=C["panel"],
+                                 highlightthickness=0, cursor="none")
+        self.verdict.place(x=M, y=TOP)
         self.show_list()
         self.rescan()
 
@@ -207,28 +135,98 @@ class WifiDialog:
     def ui(self, fn, *args):
         self.root.after(0, lambda: fn(*args) if self.win.winfo_exists() else None)
 
-    def set_status(self, text, color="black"):
-        self.status.config(text=text, fg=color)
+    def set_status(self, word, text=""):
+        c = self.verdict
+        c.delete("all")
+        c.create_text(12, VERDICT_H // 2, text=word, font=font(22, True), fill=C[VERDICT.get(word, "text")],
+                      anchor="w")
+        c.create_text(190, VERDICT_H // 2, text=text, font=font(19), fill=C["text"], anchor="w")
 
     def clear_page(self):
-        for w in self.page.winfo_children():
+        for w in self.widgets:
             w.destroy()
+        self.widgets = []
+
+    def add(self, w):
+        self.widgets.append(w)
+        return w
+
+    def bottom(self, items, back_text, back_cmd):
+        x = M
+        free = W - M - BACK_W - G - x - G * (len(items) - 1) - sum(it[3] for it in items)
+        for text, color, cmd, width in items:
+            width += free // len(items)
+            self.add(button(self.win, x, BTN_Y, width, BTN_H, text, color, cmd, "main", 17))
+            x += width + G
+        self.add(button(self.win, W - M - BACK_W, BTN_Y, BACK_W, BTN_H, back_text, C["back"], back_cmd,
+                        "secondary", 17))
+
+    # --- network list -----------------------------------------------------
 
     def show_list(self):
         self.clear_page()
-        self.netlist = NetworkList(self.page)
-        self.netlist.pack(fill=tk.BOTH, expand=True, padx=8)
-        self.netlist.set(self.nets, self.profiles)
+        self.net = None
+        lw = W - 2 * M - SIDE_W - G
+        self.list_box = self.add(tk.Frame(self.win, bg=C["bg"], cursor="none"))
+        self.list_box.place(x=M, y=BODY, width=lw, height=BOTTOM - BODY)
+        half = (BOTTOM - BODY - G) // 2
+        self.add(button(self.win, W - M - SIDE_W, BODY, SIDE_W, half, UP, C["panel2"],
+                        lambda: self.turn(-1), "secondary", 22))
+        self.add(button(self.win, W - M - SIDE_W, BODY + half + G, SIDE_W, BOTTOM - BODY - half - G, DOWN,
+                        C["panel2"], lambda: self.turn(1), "secondary", 22))
+        self.bottom([("RESCAN", C["gray"], self.rescan, 150),
+                     ("CONNECT", C["go"], self.connect_selected, 150),
+                     ("DISCONNECT", "#BF360C", self.disconnect, 150)], "CLOSE", self.close)
+        self.draw_list()
 
-        btns = tk.Frame(self.page, bg=BG)
-        btns.pack(fill=tk.X, padx=8, pady=8)
-        cfg = {'font': (FONT, 12, 'bold'), 'height': 2, 'width': 14, 'fg': "white"}
-        tk.Button(btns, text="RESCAN", bg="#607D8B", command=self.rescan, **cfg).pack(side=tk.LEFT, padx=4)
-        tk.Button(btns, text="CONNECT", bg="#4CAF50", command=self.connect_selected, **cfg).pack(side=tk.LEFT, padx=4)
-        tk.Button(btns, text="DISCONNECT", bg="#E64A19", command=self.disconnect, **cfg).pack(side=tk.RIGHT, padx=4)
+    def turn(self, step):
+        pages = max(1, (len(self.nets) + self.PER_PAGE - 1) // self.PER_PAGE)
+        self.page_no = min(pages - 1, max(0, self.page_no + step))
+        self.draw_list()
+
+    def draw_list(self):
+        if not self.list_box.winfo_exists():
+            return
+        for w in self.list_box.winfo_children():
+            w.destroy()
+        lw = W - 2 * M - SIDE_W - G
+        rh = (BOTTOM - BODY - G * (self.PER_PAGE - 1)) // self.PER_PAGE
+        first = self.page_no * self.PER_PAGE
+        for k, net in enumerate(self.nets[first:first + self.PER_PAGE]):
+            self.make_row(first + k, net, 0, k * (rh + G), lw, rh)
+        if not self.nets:
+            tk.Label(self.list_box, text="no networks yet", font=font(17), fg=C["muted"], bg=C["bg"]).place(x=12, y=12)
+
+    def make_row(self, i, net, x, y, w, h):
+        bg = C["sel"] if i == self.selected else C["panel"]
+        row = tk.Frame(self.list_box, bg=bg, cursor="none")
+        row.place(x=x, y=y, width=w, height=h)
+        name = tk.Label(row, text=net["ssid"], font=font(19, True), bg=bg, anchor="w",
+                        fg=C["good"] if net["inuse"] and i != self.selected else C["text"])
+        name.place(x=14, y=6)
+        tags = (["connected"] if net["inuse"] else []) + (["saved"] if net["ssid"] in self.profiles else []) + \
+               ["secured" if net["secure"] else "open"]
+        info = tk.Label(row, text=("  %s  " % MID).join(tags), font=font(14), fg=C["muted"], bg=bg, anchor="w")
+        info.place(x=14, y=h - 26)
+        bars = tk.Canvas(row, width=36, height=30, bg=bg, highlightthickness=0, cursor="none")
+        level = min(4, (net["signal"] + 24) // 25)
+        for b in range(4):
+            bh = 8 + b * 7
+            bars.create_rectangle(b * 9, 30 - bh, b * 9 + 6, 30, width=0,
+                                  fill=C["accent"] if b < level else C["line"])
+        bars.place(x=w - 50, y=(h - 30) // 2)
+        pct = tk.Label(row, text="%d%%" % net["signal"], font=font(16), fg=C["muted"], bg=bg, anchor="e")
+        pct.place(x=w - 110, y=(h - 22) // 2, width=52)
+        row.role = "secondary"
+        for wdg in (row, name, info, bars, pct):
+            wdg.bind("<Button-1>", lambda e, k=i: self.select(k))
+
+    def select(self, i):
+        self.selected = i
+        self.draw_list()
 
     def rescan(self):
-        self.set_status("Scanning...", "orange")
+        self.set_status("SCANNING", "looking for networks" + chr(0x2026))
 
         def task():
             profiles = saved_profiles()
@@ -239,25 +237,25 @@ class WifiDialog:
 
     def scan_done(self, profiles, nets, err):
         if nets is None:
-            self.set_status(f"Scan failed: {err[:60]}", "red")
+            self.set_status("FAIL", "scan failed: %s" % err[:50])
             return
-        self.profiles, self.nets = profiles, nets
-        if hasattr(self, 'netlist') and self.netlist.winfo_exists():
-            self.netlist.set(nets, profiles)
-        self.show_current()
+        self.profiles, self.nets, self.selected, self.page_no = profiles, nets, None, 0
+        if self.net is None:
+            self.draw_list()
+            self.show_current()
 
     def show_current(self):
         ssid, ip = wifi_status()
         if ssid:
-            self.set_status(f"Connected: {ssid}  ({ip or 'no IP'})", "darkgreen")
+            self.set_status("OK", "connected to %s, %s" % (ssid, ip or "no IP"))
         else:
-            self.set_status("Not connected", "black")
+            self.set_status("OFF", "not connected")
 
     def connect_selected(self):
-        if self.netlist.selected is None:
-            self.set_status("Select a network first", "red")
+        if self.selected is None:
+            self.set_status("INFO", "tap a network first")
             return
-        net = self.nets[self.netlist.selected]
+        net = self.nets[self.selected]
         if net["ssid"] in self.profiles:
             self.run_connect(["con", "up", "id", self.profiles[net["ssid"]]], net, ask_on_fail=True)
         elif not net["secure"]:
@@ -265,26 +263,50 @@ class WifiDialog:
         else:
             self.show_password(net)
 
+    # --- password ---------------------------------------------------------
+
     def show_password(self, net):
         self.clear_page()
-        row = tk.Frame(self.page, bg=BG)
-        row.pack(fill=tk.X, padx=8, pady=4)
-        tk.Label(row, text=f"Password for {net['ssid']}:", font=(FONT, 12), bg=BG).pack(side=tk.LEFT)
-        entry = tk.Entry(row, font=(FONT, 16), width=18, show="*")
-        entry.pack(side=tk.LEFT, padx=6)
-        show = tk.Button(row, text="SHOW", font=(FONT, 10, 'bold'), height=2, width=6)
-        show.config(command=lambda: (entry.config(show="" if entry.cget("show") else "*"),
-                                     show.config(text="HIDE" if not entry.cget("show") else "SHOW")))
-        show.pack(side=tk.LEFT, padx=2)
-        tk.Button(row, text="BACK", font=(FONT, 10, 'bold'), height=2, width=6,
-                  command=self.show_list).pack(side=tk.RIGHT, padx=2)
-        tk.Button(row, text="CONNECT", font=(FONT, 10, 'bold'), bg="#4CAF50", fg="white", height=2, width=9,
-                  command=lambda: self.run_connect(["dev", "wifi", "connect", net["ssid"], "password",
-                                                    entry.get(), "ifname", "wlan0"], net)).pack(side=tk.RIGHT, padx=2)
-        OnScreenKeyboard(self.page, entry).pack(pady=4)
+        self.net, self.password, self.show_pw = net, "", False
+        self.kbd = OnScreenKeyboard(self.win, M, BODY, W - 2 * M, BOTTOM - BODY, self.key)
+        self.widgets.extend([_KeysHolder(self.kbd)])
+        self.bottom([("SHIFT", C["panel2"], self.kbd.toggle_caps, 80),
+                     ("?123", C["panel2"], self.kbd.toggle_layout, 80),
+                     ("SPACE", C["panel2"], lambda: self.key(" "), 120),
+                     ("DEL", C["back"], self.backspace, 80),
+                     ("SHOW", C["gray"], self.toggle_show, 80),
+                     ("CONNECT", C["go"], self.connect_password, 100)], "BACK", self.back_to_list)
+        self.show_typed()
+
+    def key(self, ch):
+        if len(self.password) < 63:
+            self.password += ch
+        self.show_typed()
+
+    def backspace(self):
+        self.password = self.password[:-1]
+        self.show_typed()
+
+    def toggle_show(self):
+        self.show_pw = not self.show_pw
+        self.show_typed()
+
+    def show_typed(self):
+        shown = self.password if self.show_pw else DOT * len(self.password)
+        self.set_status("PASSWORD", "%s: %s_" % (self.net["ssid"][:14], shown[-24:]))
+
+    def connect_password(self):
+        self.run_connect(["dev", "wifi", "connect", self.net["ssid"], "password", self.password,
+                          "ifname", "wlan0"], self.net)
+
+    def back_to_list(self):
+        self.show_list()
+        self.show_current()
+
+    # --- actions ----------------------------------------------------------
 
     def run_connect(self, args, net, ask_on_fail=False):
-        self.set_status(f"Connecting to {net['ssid']}...", "orange")
+        self.set_status("RUNNING", "connecting to %s" % net["ssid"])
 
         def task():
             code, out = nmcli("-w", "30", *args)
@@ -294,23 +316,23 @@ class WifiDialog:
 
     def connect_done(self, code, out, net, ask_on_fail):
         if code == 0:
-            self.log(f"[OK] Wi-Fi connected to {net['ssid']}")
+            self.log("[OK] Wi-Fi connected to %s" % net["ssid"])
             self.show_list()
             self.rescan()
         elif ask_on_fail and net["secure"]:
-            self.log(f"[FAIL] Wi-Fi {net['ssid']}: saved profile failed, asking for password")
+            self.log("[FAIL] Wi-Fi %s: saved profile failed, asking for password" % net["ssid"])
             self.show_password(net)
-            self.set_status("Saved password failed, enter it again", "red")
+            self.set_status("FAIL", "saved password failed, type it again")
         else:
-            self.log(f"[FAIL] Wi-Fi {net['ssid']}: {out}")
-            self.set_status(f"Failed: {out[-60:]}", "red")
+            self.log("[FAIL] Wi-Fi %s: %s" % (net["ssid"], out))
+            self.set_status("FAIL", out[-50:])
 
     def disconnect(self):
-        self.set_status("Disconnecting...", "orange")
+        self.set_status("RUNNING", "disconnecting")
 
         def task():
             code, out = nmcli("dev", "disconnect", "wlan0")
-            self.log(f"[{'OK' if code == 0 else 'FAIL'}] Wi-Fi disconnect: {out}")
+            self.log("[%s] Wi-Fi disconnect: %s" % ("OK" if code == 0 else "FAIL", out))
             self.ui(self.rescan)
 
         threading.Thread(target=task, daemon=True).start()
@@ -319,3 +341,15 @@ class WifiDialog:
         self.win.destroy()
         if self.on_close:
             self.on_close()
+
+
+class _KeysHolder:
+    """Lets clear_page() remove the keyboard keys together with the other page widgets."""
+
+    def __init__(self, kbd):
+        self.kbd = kbd
+
+    def destroy(self):
+        for b in self.kbd.keys:
+            b.destroy()
+        self.kbd.keys = []

@@ -5,6 +5,7 @@ import tkinter as tk
 
 sys.path.insert(0, sys.argv[1] if len(sys.argv) > 1 else "/tmp/newgui")
 import gui_app
+from wifi_dialog import WifiDialog
 from ui_kit import G, H, M, W
 
 OUT = "/tmp/shots"
@@ -60,6 +61,14 @@ def fill(app):
     app.scan_target = "10.0.1.20"
 
 
+FAKE_NETS = [{"ssid": "Benswagin", "signal": 94, "secure": True, "inuse": True},
+             {"ssid": "Benswagin5G", "signal": 69, "secure": True, "inuse": False},
+             {"ssid": "Plyshak-wifi", "signal": 67, "secure": True, "inuse": False},
+             {"ssid": "TP-Link_8062", "signal": 57, "secure": True, "inuse": False},
+             {"ssid": "PODA_6839", "signal": 47, "secure": True, "inuse": False},
+             {"ssid": "cafe-free", "signal": 30, "secure": False, "inuse": False}]
+
+
 def rects(widget):
     out = []
     for w in widget.winfo_children():
@@ -105,7 +114,7 @@ def main():
 
     def step(i):
         if i == len(plan):
-            root.destroy()
+            wifi_checks()
             return
         shot, name, prep = plan[i]
         if name == "HOME":
@@ -122,6 +131,28 @@ def main():
             step(i + 1)
 
         root.after(900, snap)
+
+    def wifi_checks():
+        d = WifiDialog(root, print)
+        d.nets, d.selected = FAKE_NETS, 1
+        d.profiles = {"Benswagin": "preconfigured", "Benswagin5G": "Benswagin5G"}
+        d.draw_list()
+        d.set_status("OK", "connected to Benswagin, 192.168.100.81")
+
+        def snap_list():
+            check("wifi", d.win)
+            subprocess.run(["scrot", "-o", os.path.join(OUT, "p03_wifi.png")])
+            d.show_password(FAKE_NETS[1])
+            for ch in "secret7":
+                d.key(ch)
+            root.after(900, snap_pw)
+
+        def snap_pw():
+            check("wifi_pw", d.win)
+            subprocess.run(["scrot", "-o", os.path.join(OUT, "p03_wifi_pw.png")])
+            root.destroy()
+
+        root.after(900, snap_list)
 
     root.after(1500, step, 0)
     root.mainloop()

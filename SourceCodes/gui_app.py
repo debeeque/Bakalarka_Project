@@ -10,7 +10,7 @@ import time
 
 from wifi_dialog import WifiDialog, wifi_status
 from ui_kit import C, G, H, M, PORTS, TOP, W, StatusBar, button, font
-from screens import (DhcpScreen, Ipv6Screen, KeypadScreen, PathScreen, ScanScreen, SpeedScreen,
+from screens import (DhcpScreen, FunctionScreen, Ipv6Screen, KeypadScreen, PathScreen, ScanScreen, SpeedScreen,
                      SystemScreen, TargetScreen)
 
 BASE_DIR = "/home/muk0015/diploma_project"
@@ -155,10 +155,28 @@ class AnalyzerApp:
     def note(self, tile, word, text, rest):
         self.notes[tile] = (word, text, rest)
 
+    # Verdicts, logs and tile notes; discovered targets stay, a screen with a running test is kept
+    def clear_results(self):
+        self.notes.clear()
+        busy = [job["screen"] for job in self.jobs.values()]
+        for s in self.screens.values():
+            if not isinstance(s, FunctionScreen) or s in busy:
+                continue
+            if s.logbox:
+                s.logbox.config(state="normal")
+                s.logbox.delete("1.0", "end")
+                s.logbox.config(state="disabled")
+            s.set_verdict("IDLE", "")
+        return len(busy)
+
     def refresh_tiles(self):
         colors = {"PASS": "good", "OK": "good", "WARN": "warn", "FAIL": "bad", "INFO": "text", "ON": "warn",
                   "OFF": "muted"}
         st = self.port_state()
+        for name, sub, accent, cls in TILES:
+            if cls is not None and name not in self.notes:
+                self.screens["HOME"].tiles[name].word.config(text="ready", fg=C["muted"])
+                self.screens["HOME"].tiles[name].rest.config(text="")
         self.notes["DHCP / RA"] = ("ON", "", " serving") if st.get("dhcp") else ("OFF", "", " ports silent")
         self.notes["SYSTEM"] = ("Wi-Fi", "", " " + self.ssid[:12]) if self.ssid else ("Wi-Fi", " off", "")
         for name, (word, text, rest) in self.notes.items():
