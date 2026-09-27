@@ -85,6 +85,21 @@ def fake_traffic(s):
     s.app.screens["TRAFFIC"].draw()
 
 
+def fake_speed(s):
+    s.res = {"proto": "udp", "family": "v4", "mbps": 100.0, "pps": 8634, "lost": 0, "lost_pct": 0, "jitter_ms": 0.17,
+             "target": "10.0.1.20", "peer": "DESKTOP-87OV3HU", "source": "DHCP lease", "cpu_pct": 12,
+             "temp_start": 49.4, "temp_end": 51.0, "verdict": "PASS"}
+    s.set_verdict("PASS", "100.0 Mbit/s UDP v4, 0 % lost, jitter 0.17 ms")
+    s.draw()
+
+
+def fake_sweep(s):
+    s.rows = [{"frame": f, "payload": f - 46, "mbps": f / 6.0, "pps": 22000, "lost_pct": 0, "jitter_ms": 0.05}
+              for f in (64, 128, 256, 512, 1024, 1280, 1518)]
+    s.set_verdict("PASS", "UDP v4, 7 frame sizes in 1 min 18 s")
+    s.draw()
+
+
 def rects(widget):
     out = []
     for w in widget.winfo_children():
@@ -118,8 +133,7 @@ def main():
     app = gui_app.AnalyzerApp(root)
     app.unlock()
     fill(app)
-    plan = [("home", "HOME", None), ("speed", "SPEED", lambda s: (s.select_port("snd0"), s.log(SPEED_LOG),
-                                                                    s.set_verdict("PASS", "150 Mbit/s  TCP v6, snd0"))),
+    plan = [("home", "HOME", None), ("speed", "SPEED", lambda s: fake_speed(s)), ("sweep", "SWEEP", fake_sweep),
             ("scan", "SCAN", lambda s: (s.log(NMAP_LOG), s.running("nmap", None),
                                         s.set_verdict("RUNNING", "Nmap 10.0.1.20 on mon0, 12 s"))),
             ("target", "TARGET", None), ("keypad", "KEYPAD", None),

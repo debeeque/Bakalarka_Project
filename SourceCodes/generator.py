@@ -258,5 +258,8 @@ class GeneratorScreen(Screen):
             word, text = "WARN", "%d sent, %d received, %d lost" % (sent, received, sent - received)
         self.set_verdict(word, text)
         self.draw_counts(sent, received, s["desc"] + rate)
+        self.app.save_result("pkt_gen.py", self.port, {"verdict": word, "proto": PROTOS[self.proto][1], "sent": sent,
+                                                       "received": received, "counted_on": self.other(),
+                                                       "generator": res})
         self.app.note("GENERATOR", word, " %s/%d" % (received if received is not None else "-", sent),
                       " " + PROTOS[self.proto][0])

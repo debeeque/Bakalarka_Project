@@ -9,10 +9,12 @@ import sys
 import threading
 import time
 
+import results
 from wifi_dialog import WifiDialog, wifi_status
 from ui_kit import C, G, H, M, PORTS, TOP, W, StatusBar, button, font
-from screens import (DhcpScreen, FunctionScreen, Ipv6Screen, KeypadScreen, PathScreen, ScanScreen, SpeedScreen,
-                     SystemScreen, TargetScreen)
+from screens import (DhcpScreen, FunctionScreen, Ipv6Screen, KeypadScreen, PathScreen, ScanScreen, SystemScreen,
+                     TargetScreen)
+from speed import SpeedScreen, SweepScreen
 from generator import GeneratorScreen
 from traffic import FilterScreen, HostScreen, PacketScreen, PausedScreen, TrafficScreen
 
@@ -31,7 +33,7 @@ TILES = [
     ("AUTOTEST", "link, DHCP, IPv6, gateway, DNS, targets", "#1E88E5", None),
     ("TRAFFIC", "live capture, protocols, top talkers, PCAP", "#00ACC1", TrafficScreen),
     ("GENERATOR", "ICMP, ICMPv6, UDP, TCP SYN, ARP, RS", "#00ACC1", GeneratorScreen),
-    ("SPEED", "iperf3 TCP, IPv4 and IPv6", "#1E88E5", SpeedScreen),
+    ("SPEED", "iperf3 TCP and UDP, sweep, server", "#1E88E5", SpeedScreen),
     ("PORT", "speed, duplex, partner modes, LLDP, VLAN", "#43A047", None),
     ("SCAN", "ARP, IPv6 neighbours, Nmap", "#43A047", ScanScreen),
     ("IPv6", "Router Advertisement audit", "#43A047", Ipv6Screen),
@@ -42,7 +44,7 @@ TILES = [
     ("SYSTEM", "Wi-Fi, lock, desktop, power off", "#78909C", SystemScreen),
 ]
 PAGES = {"TARGET": TargetScreen, "KEYPAD": KeypadScreen, "PAUSED": PausedScreen, "PACKET": PacketScreen,
-         "FILTER": FilterScreen, "HOSTS": HostScreen}
+         "FILTER": FilterScreen, "HOSTS": HostScreen, "SWEEP": SweepScreen}
 
 
 class AnalyzerApp:
@@ -240,11 +242,13 @@ class AnalyzerApp:
 
     # --- data for screens -------------------------------------------------
 
-    def target_for(self, port, family):
-        found = self.found.get(port, {}).get(family)
-        if found:
-            return found, "discovered"
-        return self.PORTS[port][family], "hardcoded fallback"
+    def save_result(self, script, port, result):
+        try:
+            path = results.save(script, port, result)
+        except OSError as e:
+            print("save failed:", e, flush=True)
+            return None
+        return path
 
     # Written by analyzer-status.service on every link or address change
     def port_state(self):

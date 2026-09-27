@@ -2,13 +2,16 @@ import re
 import time
 import tkinter as tk
 
+import results
+
 from ui_kit import BOTTOM, C, G, M, PORTS, W, Screen, button, font, short
 
 
 class FunctionScreen(Screen):
     """Screen whose actions run one script at a time on the selected port."""
 
-    def launch(self, key, cmd, label, on_done, port=None):
+    def launch(self, key, cmd, label, on_done, port=None, script=None):
+        """script: its RESULT line is saved to ~/results and handed to on_done(rc, out, result)."""
         port = port or self.port
         busy = self.app.jobs.get(port)
         if busy:
@@ -22,44 +25,38 @@ class FunctionScreen(Screen):
         # A stopped test has no valid result: the partial output would mislead the verdict
         def done(rc, out, stopped):
             self.idle(key)
+            res = results.parse_result(out, script[:-3]) if script else None
+            if res is not None:
+                path = self.app.save_result(script, port, res)
+                if path:
+                    self.log("Saved %s" % path.replace("/home/muk0015/", "~/"))
             if stopped:
                 secs = int(time.monotonic() - start)
                 self.log("Stopped by user after %d s" % secs)
                 self.set_verdict("STOPPED", "by user after %d s on %s" % (secs, port))
                 return
-            on_done(rc, out)
+            if script:
+                on_done(rc, out, res)
+            else:
+                on_done(rc, out)
 
-        self.app.run(port, cmd, label, self, on_line=self.log, on_done=done)
+        self.app.run(port, cmd, label, self, on_line=self.show_line, on_done=done)
         return True
+
+    def show_line(self, line):
+        if not line.startswith("RESULT "):
+            self.log(line)
+
+    # Scripts without a RESULT line: the screen's own summary plus the raw output
+    def save(self, script, data, out, port=None):
+        data = dict(data, output=out.splitlines()[-400:])
+        path = self.app.save_result(script, port or self.port, data)
+        if path:
+            self.log("Saved %s" % path.replace("/home/muk0015/", "~/"))
 
     def netns(self, cmd):
         cfg = self.app.PORTS[self.port]
         return ["sudo", "ip", "netns", "exec", cfg["ns"]] + cmd
-
-
-class SpeedScreen(FunctionScreen):
-    def __init__(self, app):
-        super().__init__(app, "SPEED")
-        self.make_log(self.body)
-        self.bottom([("v4", "TCP v4", "#8E24AA", lambda: self.start("v4"), 130),
-                     ("v6", "TCP v6", "#6A1B9A", lambda: self.start("v6"), 130)])
-
-    def start(self, family):
-        target, source = self.app.target_for(self.port, family)
-        self.log("Target: %s (%s)" % (target, source))
-        cmd = self.netns(["iperf3", "-c", target, "-t", "5", "--forceflush"])
-        self.launch(family, cmd, "iperf3 TCP %s to %s" % (family, target),
-                    lambda rc, out: self.done(family, out))
-
-    def done(self, family, out):
-        match = re.findall(r"([\d.]+)\s+Mbits/sec\s+receiver", out) or re.findall(r"([\d.]+)\s+Mbits/sec", out)
-        if match:
-            text = "%s Mbit/s  TCP %s, %s" % (match[-1], family, self.port)
-            self.set_verdict("PASS", text)
-            self.app.note("SPEED", "PASS", " %s Mbit/s" % match[-1], " " + family)
-        else:
-            self.set_verdict("FAIL", "no result, see the log")
-            self.app.note("SPEED", "FAIL", "", " " + family)
 
 
 class PathScreen(FunctionScreen):
@@ -70,22 +67,26 @@ class PathScreen(FunctionScreen):
                      ("v6", "PING v6", "#BF360C", lambda: self.start("v6"), 130)])
 
     def start(self, family):
-        target, source = self.app.target_for(self.port, family)
-        self.log("Target: %s (%s)" % (target, source))
-        cmd = self.netns(["ping", "-6" if family == "v6" else "-4", "-c", "4", target])
-        self.launch(family, cmd, "ping %s %s" % (family, target), lambda rc, out: self.done(family, rc, out))
+        target = self.app.found.get(self.port, {}).get(family)
+        cfg = self.app.PORTS[self.port]
+        cmd = self.netns(["python3", "path_test.py", cfg["iface"], target or "auto", "-" + family[1]])
+        self.launch(family, cmd, "ping %s %s" % (family, target + " (found by SCAN)" if target else "auto"),
+                    lambda rc, out, res: self.done(family, res), script="path_test.py")
 
-    def done(self, family, rc, out):
-        got = re.search(r"(\d+) packets transmitted, (\d+) received", out)
-        rtt = re.search(r"= [\d.]+/([\d.]+)/", out)
-        if got and int(got.group(2)) > 0:
-            word = "PASS" if got.group(1) == got.group(2) else "WARN"
-            text = "%s/%s replies, avg %s ms" % (got.group(2), got.group(1), rtt.group(1) if rtt else "?")
+    def done(self, family, res):
+        if not res:
+            self.set_verdict("FAIL", "no result, see the log")
+            self.app.note("PATH", "FAIL", "", " " + family)
+            return
+        word = res.get("verdict", "FAIL")
+        if res.get("received"):
+            text = "%d/%d replies, avg %.1f ms" % (res["received"], res["sent"], res.get("rtt_avg", 0))
+            self.app.note("PATH", word, " %d/%d, %.1f ms" % (res["received"], res["sent"], res.get("rtt_avg", 0)),
+                          " " + family)
         else:
-            word, text = "FAIL", "no reply"
-        self.set_verdict(word, "%s  ping %s, %s" % (text, family, self.port))
-        self.app.note("PATH", word, " %s/%s, %s ms" % (got.group(2), got.group(1), rtt.group(1) if rtt else "?")
-                      if word != "FAIL" else " no reply", "")
+            text = res.get("short") or "no reply"
+            self.app.note("PATH", word, "", " " + family)
+        self.set_verdict(word, "%s  %s, %s" % (text, family, self.port))
 
 
 class ScanScreen(FunctionScreen):
@@ -135,6 +136,7 @@ class ScanScreen(FunctionScreen):
         word = "PASS" if found else "INFO"
         self.set_verdict(word, "%d hosts answered ARP on %s" % (len(found), self.port))
         self.app.note("SCAN", word if found else "INFO", " %d hosts" % len(found), "")
+        self.save("arp_scan.py", {"verdict": word, "hosts": found, "net4": self.app.PORTS[self.port]["net4"]}, out)
 
     def neighbours(self):
         cfg = self.app.PORTS[self.port]
@@ -151,6 +153,8 @@ class ScanScreen(FunctionScreen):
             n.group(1) if n else "?", store.get("v4", "none"), short(store.get("v6", "none")))
         self.set_verdict("PASS" if store else "INFO", text)
         self.app.note("SCAN", "PASS" if store else "INFO", " %s neighbours" % (n.group(1) if n else "?"), "")
+        self.save("neigh_scan.py", {"verdict": "PASS" if store else "INFO", "neighbours": int(n.group(1)) if n else None,
+                                    "target4": store.get("v4"), "target6": store.get("v6")}, out)
 
     def remember(self, out):
         store = self.app.found.setdefault(self.port, {})
@@ -180,13 +184,17 @@ class ScanScreen(FunctionScreen):
     def nmap_done(self, rc, out):
         ports = re.findall(r"^(\d+/\w+)\s+open\s+(\S+)", out, re.M)
         if "Nmap done: 0 IP addresses" in out:
-            self.set_verdict("FAIL", "nothing scanned: %s is not a valid target" % self.app.scan_target)
+            word, text = "FAIL", "nothing scanned: %s is not a valid target" % self.app.scan_target
         elif "Host seems down" in out or "0 hosts up" in out:
-            self.set_verdict("WARN", "host %s seems down" % self.app.scan_target)
+            word, text = "WARN", "host %s seems down" % self.app.scan_target
         elif ports:
-            self.set_verdict("INFO", "%d open: %s" % (len(ports), ", ".join(p for p, _ in ports[:4])))
+            word, text = "INFO", "%d open: %s" % (len(ports), ", ".join(p for p, _ in ports[:4]))
         else:
-            self.set_verdict("INFO", "no open ports among the 100 most common")
+            word, text = "INFO", "no open ports among the 100 most common"
+        self.set_verdict(word, text)
+        self.save("nmap", {"verdict": word, "target": self.app.scan_target, "via": self.mode,
+                           "open": ["%s %s" % p for p in ports]}, out,
+                  port=self.port if self.mode == "LAN" else "wifi")
 
 
 class TargetScreen(Screen):
@@ -296,6 +304,7 @@ class Ipv6Screen(FunctionScreen):
         self.set_verdict(word, "%s on %s" % (text, self.port))
         self.app.note("IPv6", word, " %d router%s" % (total, "" if total == 1 else "s"),
                       ", %d foreign" % foreign if foreign else "")
+        self.save("ra_audit.py", {"verdict": word, "routers": total, "foreign": foreign, "alerts": alerts}, out)
 
 
 class DhcpScreen(FunctionScreen):

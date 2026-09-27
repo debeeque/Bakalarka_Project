@@ -67,9 +67,12 @@ start_dhcp_port() {
     n=$(port_net $dev)
     stop_dhcp_port $dev
     in_ns $dev $ns || { echo "Port $dev: not set up, nothing served"; return 2; }
+    # Addresses only: no router and no DNS, the device routes nowhere and a host keeps its own uplink
     ip netns exec $ns dnsmasq --interface=$dev --bind-interfaces \
         --dhcp-range=10.0.$n.20,10.0.$n.20,255.255.255.0,12h \
-        --dhcp-range=fd00:$n::20,fd00:$n::20,slaac,64,12h --enable-ra \
+        --dhcp-range=fd00:$n::20,fd00:$n::20,slaac,64,12h --enable-ra --ra-param=$dev,0,0 \
+        --dhcp-option=option:router --dhcp-option=option:dns-server --dhcp-option=option6:dns-server \
+        --dhcp-leasefile=$RUN/dnsmasq_$dev.leases \
         --pid-file=$RUN/dnsmasq_$dev.pid || return 1
     echo "Port $dev: DHCP and RA active."
 }

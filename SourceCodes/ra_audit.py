@@ -140,7 +140,7 @@ def audit(pkt, own, local):
     if not ip6.src.lower().startswith("fe80"):
         notes.append(("WARN", "source %s is not link-local, RFC 4861" % ip6.src))
     if ra.routerlifetime == 0:
-        notes.append(("WARN", "router lifetime 0, not a default router"))
+        notes.append(("INFO" if kind != "FOREIGN" else "WARN", "router lifetime 0, prefixes only, not a default router"))
 
     lladdr = None
     prefixes = []
