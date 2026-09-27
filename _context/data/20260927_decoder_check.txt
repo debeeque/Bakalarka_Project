@@ -1,0 +1,85 @@
+  1 type 143 MLDv2 report   code 0                             fields  9  OK
+      not decoded (tshark has): ipv6.nxt
+  2 type 143 MLDv2 report   code 0                             fields  9  OK
+      not decoded (tshark has): ipv6.nxt
+  3 type 143 MLDv2 report   code 0                             fields  9  OK
+      not decoded (tshark has): ipv6.nxt
+  4 type 143 MLDv2 report   code 0                             fields  9  OK
+      not decoded (tshark has): ipv6.nxt
+  5 type 134 Router Advertisement   code 0                     fields 26  OK
+  6 type 134 Router Advertisement   code 0                     fields 26  OK
+  7 type 135 Neighbor Solicitation   code 0                    fields 11  OK
+  8 type 135 Neighbor Solicitation   code 0                    fields 11  OK
+  9 type 135 Neighbor Solicitation   code 0                    fields 11  OK
+ 10 type 135 Neighbor Solicitation   code 0                    fields 11  OK
+ 11 type 8 echo request   code 0   id 7   seq 1                fields 13  OK
+      not decoded (tshark has): ip.frag_offset
+ 12 type 0 echo reply   code 0   id 7   seq 1                  fields 13  OK
+      not decoded (tshark has): ip.frag_offset
+ 13 40000 > 53   length 39                                     fields 16  OK
+      not decoded (tshark has): ip.frag_offset
+ 14 53 > 40000   length 68                                     fields 16  OK
+      not decoded (tshark has): ip.frag_offset
+ 15 68 > 67   length 252                                       fields 15  OK
+      not decoded (tshark has): ip.frag_offset
+ 16 type 8 echo request   code 0   id 6621   seq 0             fields 13  OK
+      not decoded (tshark has): ip.frag_offset
+ 17 67 > 68   length 252                                       fields 15  OK
+      not decoded (tshark has): ip.frag_offset
+ 18 12345 > 80   flags [S]   seq 1000   ack 0   win 64240      fields 15  OK
+      not decoded (tshark has): ip.frag_offset
+ 19 80 > 12345   flags [SA]   seq 5000   ack 1001   win 65160  fields 15  OK
+      not decoded (tshark has): ip.frag_offset
+ 20 5000 > 5001   length 72                                    fields 12  OK
+      not decoded (tshark has): ip.frag_offset
+ 21 00:e0:4c:68:02:23 > 00:e0:4c:68:02:01   type 0x0800 IPv4   fields 10  OK
+ 22 who-has 10.0.1.10 tell 10.0.2.10                           fields  6  OK
+      not decoded (tshark has): arp.src.hw_mac
+ 23 10.0.2.10 is-at 00:e0:4c:68:02:23                          fields  6  OK
+      not decoded (tshark has): arp.dst.proto_ipv4
+ 24 type 128 echo request   code 0   id 9   seq 3              fields 12  OK
+ 25 type 129 echo reply   code 0   id 9   seq 3                fields 12  OK
+ 26 type 129 echo reply   code 0   id 9   seq 3                fields 12  OK
+ 27 type 133 Router Solicitation   code 0                      fields 11  OK
+ 28 type 134 Router Advertisement   code 0                     fields 26  OK
+ 29 type 134 Router Advertisement   code 0                     fields 26  OK
+ 30 type 134 Router Advertisement   code 0                     fields 23  OK
+ 31 type 135 Neighbor Solicitation   code 0                    fields 12  OK
+ 32 type 136 Neighbor Advertisement   code 0                   fields 15  OK
+ 33 type 136 Neighbor Advertisement   code 0                   fields 15  OK
+ 34 type 143 MLDv2 report   code 0                             fields  9  OK
+      not decoded (tshark has): ipv6.nxt
+ 35 546 > 547   length 32                                      fields 12  OK
+ 36 33000 > 443   flags [S]   seq 42   ack 0   win 64800       fields 14  OK
+ 37 type 135 Neighbor Solicitation   code 0                    fields 12  OK
+ 38 type 136 Neighbor Advertisement   code 0                   fields 15  OK
+ 39 443 > 33000   flags [RA]   seq 0   ack 43   win 0          fields 14  OK
+ 40 type 2 packet too big   code 0   MTU 1400                  fields 11  OK
+      not decoded (tshark has): udp.dstport, udp.length, udp.srcport
+ 41 type 1 destination unreachable   code 4                    fields 10  OK
+      not decoded (tshark has): udp.dstport, udp.length, udp.srcport
+ 42 6000 > 6001   length 56                                    fields 10  OK
+      not decoded (tshark has): ipv6.nxt
+ 43 type 8 echo request   code 0   id 1   seq 9                fields 14  OK
+      not decoded (tshark has): ip.frag_offset
+ 44 00:e0:4c:68:02:23 > 01:80:c2:00:00:0e   type 0x88cc LLDP   fields  3  OK
+ 45 67 > 68   length 308                                       fields 15  OK
+      not decoded (tshark has): ip.frag_offset
+ 46 type 134 Router Advertisement   code 0                     fields 26  OK
+ 47 547 > 546   length 72                                      fields 12  OK
+ 48 type 1 destination unreachable   code 4                    fields 10  OK
+      not decoded (tshark has): dhcpv6.msgtype, udp.dstport, udp.length, udp.srcport
+ 49 type 133 Router Solicitation   code 0                      fields 11  OK
+ 50 type 134 Router Advertisement   code 0                     fields 26  OK
+ 51 type 135 Neighbor Solicitation   code 0                    fields 12  OK
+ 52 type 136 Neighbor Advertisement   code 0                   fields 14  OK
+ 53 type 135 Neighbor Solicitation   code 0                    fields 12  OK
+ 54 type 136 Neighbor Advertisement   code 0                   fields 14  OK
+ 55 type 134 Router Advertisement   code 0                     fields 26  OK
+ 56 who-has 10.0.1.20 tell 10.0.1.10                           fields  6  OK
+      not decoded (tshark has): arp.src.hw_mac
+ 57 who-has 10.0.1.20 tell 10.0.1.10                           fields  6  OK
+      not decoded (tshark has): arp.src.hw_mac
+ 58 who-has 10.0.1.20 tell 10.0.1.10                           fields  6  OK
+      not decoded (tshark has): arp.src.hw_mac
+frames 58, fields compared 781, mismatches 0

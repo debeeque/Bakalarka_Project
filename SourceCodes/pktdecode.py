@@ -62,12 +62,15 @@ def is_host(b):
 
 
 def v6_payload(data, off):
+    """Walk the extension header chain: (upper protocol, its offset, headers, fragment offset in bytes)."""
     nh = data[off + 6]
     p = off + 40
     exts = []
+    frag = 0
     while nh in V6_EXT and len(data) >= p + 8:
         exts.append(nh)
         if nh == 44:
+            frag = struct.unpack_from("!H", data, p + 2)[0] & 0xFFF8
             length = 8
         elif nh == 51:
             length = (data[p + 1] + 2) * 4
@@ -75,7 +78,7 @@ def v6_payload(data, off):
             length = (data[p + 1] + 1) * 8
         nh = data[p]
         p += length
-    return nh, p, exts
+    return nh, p, exts, frag
 
 
 def parse(data):
@@ -95,8 +98,7 @@ def parse(data):
         frag = (data[off + 6] & 0x1F) << 8 | data[off + 7]
     elif etype == 0x86DD and n >= off + 40:
         src, dst = data[off + 8:off + 24], data[off + 24:off + 40]
-        proto, l4, _ = v6_payload(data, off)
-        frag = 0
+        proto, l4, _, frag = v6_payload(data, off)
     elif etype == 0x0806 and n >= off + 28:
         return "ARP", data[off + 14:off + 18], data[off + 24:off + 28], 0, 0, 0
     else:
@@ -161,7 +163,7 @@ def _ipv4(data, off, out):
         flags.append("MF")
     offset = (frag & 0x1FFF) * 8
     out.append(("IPv4", "%s > %s" % (ip4(data[off + 12:off + 16]), ip4(data[off + 16:off + 20]))))
-    extra = "   fragment offset %d" % offset if offset else ""
+    extra = "   fragment offset %d B" % offset if offset else ""
     out.append(("", "ttl %d   length %d   id 0x%04x   %s   proto %d %s%s"
                 % (ttl, total, ident, " ".join(flags) or "-", proto, L4_CAT.get(proto, ""), extra)))
     if offset:
@@ -174,12 +176,15 @@ def _ipv6(data, off, out):
     tc = (first >> 20) & 0xFF
     flow = first & 0xFFFFF
     out.append(("IPv6", "%s > %s" % (ip6(data[off + 8:off + 24]), ip6(data[off + 24:off + 40]))))
-    proto, l4, exts = v6_payload(data, off)
+    proto, l4, exts, frag = v6_payload(data, off)
     ext = "   ext %s" % ",".join(str(e) for e in exts) if exts else ""
     out.append(("", "hop limit %d   payload %d B   next header %d %s%s"
                 % (hlim, plen, proto, L4_CAT.get(proto, ""), ext)))
     if tc or flow:
         out.append(("", "traffic class 0x%02x   flow label 0x%05x" % (tc, flow)))
+    if frag:
+        out.append(("", "fragment offset %d B, no upper-layer header in this fragment" % frag))
+        return
     _l4(data, l4, proto, out, 6)
 
 
@@ -209,6 +214,10 @@ def _l4(data, off, proto, out, family):
             ident, seq = struct.unpack_from("!HH", data, off + 4)
             text += "   id %d   seq %d" % (ident, seq)
         out.append(("ICMP", text))
+        if t in (3, 11, 12) and len(data) >= off + 28:
+            inner = off + 8
+            out.append(("", "original: %s > %s   proto %d" % (
+                ip4(data[inner + 12:inner + 16]), ip4(data[inner + 16:inner + 20]), data[inner + 9])))
     elif proto == 58:
         _icmp6(data, off, out)
 
@@ -267,6 +276,10 @@ def _icmp6(data, off, out):
     elif t == 2:
         text += "   MTU %d" % struct.unpack_from("!I", data, off + 4)[0]
     out.append(("ICMPv6", text))
+    if t in (1, 2, 3, 4) and len(data) >= off + 48:
+        inner = off + 8
+        out.append(("", "original: %s > %s   next header %d" % (
+            ip6(data[inner + 8:inner + 24]), ip6(data[inner + 24:inner + 40]), data[inner + 6])))
     opts = None
     if t == 133:
         opts = off + 8
