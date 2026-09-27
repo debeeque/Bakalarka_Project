@@ -1,0 +1,7 @@
+# sniff_stats mon0 top talkers and ports; separator ';', integers only
+kind;rank;address_or_port;service;bytes;packets
+talker;1;fe80::2e0:4cff:fe68:223;;13356542;8952
+talker;2;fe80::2e0:4cff:fe68:201;;218621;2501
+talker;3;10.0.1.20;;9920;102
+talker;4;10.0.1.10;;9884;102
+port;1;tcp/5201;;;11251
