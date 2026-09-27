@@ -128,7 +128,7 @@ def main():
             ("path", "PATH", lambda s: s.set_verdict("PASS", "4/4 replies, avg 1.0 ms  ping v6, mon0")),
             ("dhcp", "DHCP / RA", None), ("system", "SYSTEM", None),
             ("traffic", "TRAFFIC", lambda s: fake_traffic(s)), ("paused", "PAUSED", None),
-            ("packet", "PACKET", None), ("filter", "FILTER", None), ("hosts", "HOSTS", None)]
+            ("packet", "PACKET", None), ("filter", "FILTER", None), ("hosts", "HOSTS", None), ("generator", "GENERATOR", None)]
 
     def step(i):
         if i == len(plan):

@@ -13,6 +13,7 @@ from wifi_dialog import WifiDialog, wifi_status
 from ui_kit import C, G, H, M, PORTS, TOP, W, StatusBar, button, font
 from screens import (DhcpScreen, FunctionScreen, Ipv6Screen, KeypadScreen, PathScreen, ScanScreen, SpeedScreen,
                      SystemScreen, TargetScreen)
+from generator import GeneratorScreen
 from traffic import FilterScreen, HostScreen, PacketScreen, PausedScreen, TrafficScreen
 
 BASE_DIR = "/home/muk0015/diploma_project"
@@ -29,7 +30,7 @@ if os.path.exists(BASE_DIR):
 TILES = [
     ("AUTOTEST", "link, DHCP, IPv6, gateway, DNS, targets", "#1E88E5", None),
     ("TRAFFIC", "live capture, protocols, top talkers, PCAP", "#00ACC1", TrafficScreen),
-    ("GENERATOR", "ICMP, ICMPv6, UDP, TCP SYN, ARP, RS", "#00ACC1", None),
+    ("GENERATOR", "ICMP, ICMPv6, UDP, TCP SYN, ARP, RS", "#00ACC1", GeneratorScreen),
     ("SPEED", "iperf3 TCP, IPv4 and IPv6", "#1E88E5", SpeedScreen),
     ("PORT", "speed, duplex, partner modes, LLDP, VLAN", "#43A047", None),
     ("SCAN", "ARP, IPv6 neighbours, Nmap", "#43A047", ScanScreen),
