@@ -1,14 +1,25 @@
-\chapter{Zdrojové kódy síťových skriptů (Bash a Python)}
+\chapter{Zdrojové kódy měřicích skriptů}
 \label{sec:Appendix1}
 
-\section*{Skript pro nastavení izolovaných síťových prostředí (setup\_network.sh)}
-\lstinputlisting[language=bash, label=src:SetupNetwork, caption={Inicializační skript pro konfiguraci Linux Network Namespaces a DHCP serverů}]{SourceCodes/setup_network.sh}
+Příloha obsahuje skripty, které vykonávají vlastní síťovou práci přístroje. Každý z nich je samostatným nástrojem spustitelným i z příkazové řádky ve jmenném prostoru zvoleného portu. Přehled všech souborů programového vybavení je uveden v Příloze \ref{sec:Appendix2}.
 
-\section*{Skript pro skenování sítě pomocí protokolu ARP (arp\_scan.py)}
-\lstinputlisting[language=python, label=src:ArpScan, caption={Skript využívající knihovnu Scapy pro detekci aktivních zařízení v síti}]{SourceCodes/arp_scan.py}
+\section*{Příprava testovacích portů (setup\_network.sh)}
+\lstinputlisting[language=bash, label=src:SetupNetwork, caption={Přesun portů do jmenných prostorů, nastavení adres a spouštění serveru dnsmasq}]{SourceCodes/setup_network.sh}
 
-\section*{Skript pro audit zpráv Router Advertisement (ra\_audit.py)}
-\lstinputlisting[language=python, label=src:RaAudit, caption={Skript pro vyžádání, rozbor a posouzení zprávy Router Advertisement}]{SourceCodes/ra_audit.py}
+\section*{Analyzátor provozu (sniff\_stats.py)}
+\lstinputlisting[language=python, label=src:SniffStats, caption={Zachytávání nástrojem tcpdump s filtrem BPF a výpočet statistik provozu}]{SourceCodes/sniff_stats.py}
 
-\section*{Skript pro vyhledání sousedů v segmentu (neigh\_scan.py)}
-\lstinputlisting[language=python, label=src:NeighScan, caption={Skript pro vyjmenování sousedů protokolu IPv6 a odvození jejich adres postupem EUI-64}]{SourceCodes/neigh_scan.py}
+\section*{Generátor paketů (pkt\_gen.py)}
+\lstinputlisting[language=python, label=src:PktGen, caption={Sestavení rámců knihovnou Scapy a jejich odeslání zadanou rychlostí}]{SourceCodes/pkt_gen.py}
+
+\section*{Měření propustnosti, ztrátovosti a rozptylu zpoždění (perf\_test.py)}
+\lstinputlisting[language=python, label=src:PerfTest, caption={Řízení nástroje iperf3, rozmítání velikostí rámce a vyhodnocení výsledku}]{SourceCodes/perf_test.py}
+
+\section*{Audit zpráv Router Advertisement (ra\_audit.py)}
+\lstinputlisting[language=python, label=src:RaAudit, caption={Vyžádání, rozbor a posouzení zprávy Router Advertisement}]{SourceCodes/ra_audit.py}
+
+\section*{Vyhledání sousedů protokolu IPv6 (neigh\_scan.py)}
+\lstinputlisting[language=python, label=src:NeighScan, caption={Vyjmenování sousedů a odvození jejich adres postupem EUI-64}]{SourceCodes/neigh_scan.py}
+
+\section*{Skenování protokolem ARP (arp\_scan.py)}
+\lstinputlisting[language=python, label=src:ArpScan, caption={Vyhledání aktivních stanic v rozsahu adres portu}]{SourceCodes/arp_scan.py}

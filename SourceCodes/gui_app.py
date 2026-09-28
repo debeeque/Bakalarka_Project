@@ -189,7 +189,8 @@ class AnalyzerApp:
             t = self.screens["HOME"].tiles.get(name)
             if t is not None:
                 t.word.config(text=word + text, fg=C[colors.get(word, "text")])
-                t.rest.config(text=rest)
+                # The tile is ~190 px wide: drop the tail rather than cut it in half
+                t.rest.config(text=rest if len(word + text + rest) <= 20 else "")
 
     # --- running scripts, one job per port --------------------------------
 

@@ -217,8 +217,8 @@ def sweep(args, res):
         res.update(mbps=max(r["mbps"] for r in rows), lost_pct=max(r["lost_pct"] for r in rows), proto="udp")
     if args.csv and rows:
         with open(args.csv, "w", newline="") as f:
-            f.write("# perf_test sweep %s %s to %s; ';' separated, '.' decimal\n" % (res["family"], args.iface,
-                                                                                    res["target"]))
+            f.write("# perf_test sweep %s %s to %s; ';' separated, '.' decimal\n"
+                    % (res["family"], args.iface, res["target"]))
             w = csv.writer(f, delimiter=";")
             keys = ["frame", "payload", "mbps", "frame_mbps", "mbps_sent", "pps", "packets", "lost", "lost_pct",
                     "jitter_ms"]

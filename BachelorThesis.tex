@@ -12,6 +12,13 @@
 \usepackage{dcolumn} % sloupce tabulky s ciselnymi hodnotami
 \usepackage{subfig} % makra pro "podobrazky" a "podtabulky"
 \usepackage[cpp]{diplomalst}
+\lstset{breaklines=true} % dlouhe radky kodu v prilohach zalomit misto preteceni okraje
+\usepackage{tikz} % blokova schemata
+\usetikzlibrary{fit,arrows.meta}
+\usepackage{pgfplots} % grafy z namerenych dat
+\pgfplotsset{compat=1.18}
+% Adresy a nazvy v neproporcionalnim pismu nelze delit; radeji mirne roztahnout mezery nez pretect okraj
+\setlength{\emergencystretch}{2em}
 
 % Zadame pozadovane vstupy pro generovani titulnich stran.
 \ThesisAuthor{Mikhail Mukanov}
@@ -29,19 +36,34 @@
 % Pokud nechceme nikomu dekovat makro zapoznamkujeme.
 \Acknowledgement{Rád bych na tomto místě poděkoval všem, kteří mi s prací pomohli, protože bez nich by tato práce nevznikla.}
 
-\CzechAbstract{Tato bakalářská práce se zabývá návrhem a realizací přenosného zařízení pro testování, monitorování a bezpečnostní audit počítačových sítí. Cílem práce bylo vytvořit autonomní nástroj schopný generovat a analyzovat síťový provoz protokolů IPv4 a IPv6. Hardwarové řešení je postaveno na jednodeskovém počítači Raspberry Pi, který je doplněn o dotykový displej a dva externí síťové adaptéry. Klíčovým přínosem softwarové části, implementované v jazyce Python s vlastním grafickým rozhraním, je využití technologie Linux Network Namespaces (netns) pro logickou izolaci testovacích portů. Zařízení poskytuje funkce pro pasivní odposlech provozu, aktivní měření propustnosti nástrojem iperf3 a nově také pokročilý průzkum sítě (Network Reconnaissance) pomocí integrovaného skeneru Nmap, a to jak v metalických, tak bezdrátových sítích. Funkčnost vyvinutého prototypu byla úspěšně ověřena v laboratorním prostředí.}
+\CzechAbstract{Tato bakalářská práce se zabývá návrhem a realizací přenosného zařízení pro testování a monitorování počítačových sítí. Zařízení je postaveno na jednodeskovém počítači Raspberry Pi s dotykovým displejem, dvěma externími síťovými adaptéry a akumulátorovým modulem a ovládá se bez připojeného počítače. Oba testovací porty jsou logicky odděleny jmennými prostory jádra Linux, takže přístroj může jedním portem provoz generovat a druhým jej nezávisle analyzovat. Zařízení obsahuje analyzátor provozu protokolů IPv4 a IPv6 se statistikami, rozborem rámců a filtry vyhodnocovanými v jádře, generátor paketů, měření zpoždění, propustnosti, ztrátovosti a rozptylu zpoždění nástrojem iperf3 včetně rozmítání velikostí rámce, audit zpráv Router Advertisement a vyhledání sousedů protokolu IPv6. Přesnost analyzátoru byla ověřena nezávislým přepočtem zachyceného provozu a měření proběhla na propojce mezi porty i proti počítačům se systémy Linux a Windows. Práce vymezuje i meze použité platformy, zejména propustnost omezenou sběrnicí USB 2.0 na přibližně 276 Mbit/s. V typickém provozu vydrží přístroj z akumulátoru téměř sedm hodin.}
 
-\CzechKeywords{počítačové sítě; monitorování sítě; generování provozu; Raspberry Pi; Network Namespaces; Nmap; bezpečnostní audit; IPv4; IPv6; propustnost sítě}
+\CzechKeywords{počítačové sítě; monitorování sítě; generování provozu; analyzátor provozu; Raspberry Pi; Network Namespaces; IPv4; IPv6; propustnost; ztrátovost}
 
-\EnglishAbstract{This bachelor thesis deals with the design and implementation of a portable device for testing, monitoring, and security auditing of computer networks. The main objective was to create an autonomous tool capable of generating and analyzing IPv4 and IPv6 network traffic. The hardware solution is based on a Raspberry Pi single-board computer, equipped with a touch screen and two external network adapters. A key contribution of the software part, implemented in Python with a custom graphical user interface, is the use of Linux Network Namespaces (netns) technology for the logical isolation of testing ports. The device provides features for passive traffic sniffing, active throughput measurement using iperf3, and advanced network reconnaissance using the integrated Nmap scanner in both wired and wireless networks. The functionality of the developed prototype was successfully verified in a laboratory environment.}
+\EnglishAbstract{This bachelor thesis deals with the design and implementation of a portable device for testing and monitoring computer networks. The device is built on a Raspberry Pi single-board computer with a touch screen, two external network adapters and a battery module, and it is operated without a connected computer. Both test ports are logically isolated by Linux network namespaces, so that the device can generate traffic on one port and analyse it independently on the other. The device contains an IPv4 and IPv6 traffic analyser with statistics, frame decoding and filters evaluated in the kernel, a packet generator, measurement of delay, throughput, packet loss and jitter with iperf3 including a sweep over frame sizes, an audit of Router Advertisement messages and IPv6 neighbour discovery. The accuracy of the analyser was verified by an independent recount of the captured traffic, and the measurements were carried out both over a cable between the two ports and against computers running Linux and Windows. The thesis also defines the limits of the platform used, in particular the throughput limited by the USB 2.0 bus to about 276 Mbit/s. In typical operation the device runs on its battery for almost seven hours.}
 
-\EnglishKeywords{computer networks; network monitoring; traffic generation; Raspberry Pi; Network Namespaces; Nmap; security audit; IPv4; IPv6; network throughput}
+\EnglishKeywords{computer networks; network monitoring; traffic generation; traffic analyser; Raspberry Pi; network namespaces; IPv4; IPv6; throughput; packet loss}
 
-\AddAcronym{DVD}{Digital Versatile Disc}
-\AddAcronym{TNT}{Trinitrotoluen}
-\AddAcronym{UML}{Unified Modeling Language}
-\AddAcronym{HTML}{Hyper Text Markup Language}
-\AddAcronym{TUG}{\TeX{} Users Group}
+\AddAcronym{ARP}{Address Resolution Protocol}
+\AddAcronym{BPF}{Berkeley Packet Filter}
+\AddAcronym{CSV}{Comma-Separated Values}
+\AddAcronym{DHCP}{Dynamic Host Configuration Protocol}
+\AddAcronym{DNS}{Domain Name System}
+\AddAcronym{EUI-64}{64-bit Extended Unique Identifier}
+\AddAcronym{GPIO}{General-Purpose Input/Output}
+\AddAcronym{HDMI}{High-Definition Multimedia Interface}
+\AddAcronym{I2C}{Inter-Integrated Circuit}
+\AddAcronym{ICMP}{Internet Control Message Protocol}
+\AddAcronym{IP}{Internet Protocol}
+\AddAcronym{JSON}{JavaScript Object Notation}
+\AddAcronym{LAN}{Local Area Network}
+\AddAcronym{MTU}{Maximum Transmission Unit}
+\AddAcronym{NTP}{Network Time Protocol}
+\AddAcronym{RFC}{Request for Comments}
+\AddAcronym{TCP}{Transmission Control Protocol}
+\AddAcronym{UDP}{User Datagram Protocol}
+\AddAcronym{USB}{Universal Serial Bus}
+\AddAcronym{VLAN}{Virtual Local Area Network}
 
 \addbibresource{literature.bib}
 

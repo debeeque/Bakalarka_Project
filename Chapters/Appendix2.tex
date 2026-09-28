@@ -1,7 +1,44 @@
-\chapter{Zdrojový kód grafického uživatelského rozhraní (GUI)}
+\chapter{Přehled programového vybavení přístroje}
 \label{sec:Appendix2}
 
-\section*{Hlavní řídicí aplikace (gui\_app.py)}
-Následující kód představuje kompletní implementaci grafického rozhraní a řídicí logiky analyzátoru. Kód byl očištěn a optimalizován pro nasazení na zařízení Raspberry Pi.
+Programové vybavení je uloženo v adresáři \texttt{\textasciitilde/diploma\_project/} na paměťové kartě přístroje; systémové soubory jsou na obvyklých místech systému. Úplné zdrojové kódy všech souborů jsou součástí elektronické přílohy práce. Tabulka \ref{tab:soubory} uvádí jejich přehled; skripty otištěné v Příloze \ref{sec:Appendix1} jsou označeny hvězdičkou.
 
-\lstinputlisting[language=python, label=src:GuiApp, caption={Hlavní aplikace v jazyce Python s využitím knihovny Tkinter}]{SourceCodes/gui_app.py}
+\begin{table}[htbp]
+    \caption{Soubory programového vybavení přístroje}
+    \label{tab:soubory}
+    \centering
+    \small
+    \begin{tabular}{lp{9.5cm}}
+        \hline
+        Soubor & Účel \\
+        \hline
+        \multicolumn{2}{l}{\textit{Měřicí skripty, spouštěné ve jmenném prostoru portu}} \\
+        \texttt{setup\_network.sh}* & příprava portů, jmenných prostorů a serveru dnsmasq \\
+        \texttt{sniff\_stats.py}* & analyzátor provozu, statistiky a ukládání do formátu pcap a CSV \\
+        \texttt{pktdecode.py} & rozbor hlaviček rámce bez knihovny Scapy, pro statistiky i pro rozbor po vrstvách \\
+        \texttt{pkt\_gen.py}* & generátor paketů šesti typů \\
+        \texttt{perf\_test.py}* & měření nástrojem iperf3 a rozmítání velikostí rámce \\
+        \texttt{perf\_server.py} & server iperf3 na zvoleném portu \\
+        \texttt{path\_test.py} & test dostupnosti a zpoždění nástrojem ping \\
+        \texttt{targets.py} & společné vyhledání cíle a vysvětlení, proč cíl chybí \\
+        \texttt{ra\_audit.py}* & audit zpráv Router Advertisement \\
+        \texttt{neigh\_scan.py}* & vyhledání sousedů protokolu IPv6 \\
+        \texttt{arp\_scan.py}* & skenování protokolem ARP \\
+        \multicolumn{2}{l}{\textit{Řídicí aplikace}} \\
+        \texttt{gui\_app.py} & hlavní obrazovka, spouštění úloh, uvítací a zamykací obrazovka \\
+        \texttt{ui\_kit.py} & společný vzhled obrazovek, stavový řádek, tlačítka \\
+        \texttt{screens.py} & obrazovky PATH, SCAN, IPv6, DHCP / RA a SYSTEM \\
+        \texttt{traffic.py} & obrazovka TRAFFIC s rozborem rámce a filtry \\
+        \texttt{generator.py} & obrazovka GENERATOR \\
+        \texttt{speed.py} & obrazovka SPEED s rozmítáním a režimem serveru \\
+        \texttt{results.py} & ukládání výsledků do souborů JSON \\
+        \texttt{wifi\_dialog.py} & připojení k síti Wi-Fi a klávesnice na obrazovce \\
+        \multicolumn{2}{l}{\textit{Systémové služby}} \\
+        \texttt{port\_status.py} & sledování stavu portů a zápis do stavového souboru \\
+        \texttt{ups\_monitor.py} & měření stavu akumulátoru a řádné vypnutí při vybití \\
+        \texttt{analyzer-port@.service} & příprava portu při připojení adaptéru \\
+        \texttt{10-analyzer-*.link} & stálá jména portů podle fyzické adresy \\
+        \texttt{\textasciitilde/.xinitrc} & spuštění řídicí aplikace místo pracovní plochy \\
+        \hline
+    \end{tabular}
+\end{table}

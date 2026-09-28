@@ -187,6 +187,8 @@ class ScanScreen(FunctionScreen):
             word, text = "FAIL", "nothing scanned: %s is not a valid target" % self.app.scan_target
         elif "Host seems down" in out or "0 hosts up" in out:
             word, text = "WARN", "host %s seems down" % self.app.scan_target
+        elif "due to host timeout" in out:
+            word, text = "WARN", "scan not finished: %s timed out after 30 s" % self.app.scan_target
         elif ports:
             word, text = "INFO", "%d open: %s" % (len(ports), ", ".join(p for p, _ in ports[:4]))
         else:

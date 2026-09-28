@@ -1,0 +1,39 @@
+% Blokove schema programove architektury analyzatoru
+\begin{tikzpicture}[
+    font=\small,
+    box/.style={draw, rounded corners=2pt, align=center, minimum height=8mm, inner sep=3pt, fill=white},
+    port/.style={draw, thick, align=center, minimum width=16mm, minimum height=7mm, fill=gray!15},
+    ns/.style={draw, dashed, rounded corners=4pt, inner sep=5pt},
+    lbl/.style={font=\footnotesize\itshape, align=center},
+    >=Stealth]
+
+    % vychozi jmenny prostor
+    \node[box, minimum width=38mm] (gui) at (0,0) {řídicí aplikace\\(Tkinter, displej)};
+    \node[box, minimum width=30mm] (sluzby) at (5.2,0.6) {služby systemd:\\porty, stav portů,\\napájení};
+    \node[box, minimum width=30mm] (vysledky) at (5.2,-0.8) {adresář výsledků\\JSON, CSV, pcap};
+    \node[box, minimum width=18mm] (wlan) at (-4.4,0) {\texttt{wlan0}\\Wi-Fi};
+    \node[ns, fit=(gui)(sluzby)(vysledky)(wlan)] (vychozi) {};
+    \node[lbl, anchor=south west] at (vychozi.north west) {výchozí jmenný prostor};
+
+    % jmenne prostory testovacich portu
+    \node[box, minimum width=40mm] (skripty1) at (-3.2,-3.6) {skripty měření\\(analyzátor, ping, iperf3, audit)};
+    \node[port] (mon0) at (-3.2,-5.1) {\texttt{mon0}};
+    \node[ns, fit=(skripty1)(mon0)] (nsmon) {};
+    \node[lbl, rotate=90, anchor=south] at (nsmon.west) {\texttt{analyzer\_monitor}};
+
+    \node[box, minimum width=40mm] (skripty2) at (3.2,-3.6) {skripty měření\\(generátor, ping, iperf3, audit)};
+    \node[port] (snd0) at (3.2,-5.1) {\texttt{snd0}};
+    \node[ns, fit=(skripty2)(snd0)] (nssnd) {};
+    \node[lbl, rotate=-90, anchor=south] at (nssnd.east) {\texttt{analyzer\_sender}};
+
+    % spusteni skriptu v prostoru portu a navrat vysledku
+    \coordinate (rozcesti) at (0,-1.9);
+    \draw[<->] (gui.south) -- (rozcesti) -| (skripty1.north);
+    \draw[<->] (rozcesti) -| (skripty2.north);
+    \node[lbl, fill=white] at (rozcesti) {spuštění příkazem \texttt{ip netns exec}\\a návrat řádku \texttt{RESULT}};
+    \draw[->] (sluzby.west) -- node[lbl, above] {stav} (sluzby.west -| gui.east);
+    \draw[->] (vysledky.west -| gui.east) -- node[lbl, below] {uložení} (vysledky.west);
+
+    % kabel mezi porty nebo do testovane site
+    \draw[thick] (mon0.south) -- ++(0,-0.6) -| node[lbl, pos=0.25, below] {testovaný segment nebo propojka mezi porty} (snd0.south);
+\end{tikzpicture}
