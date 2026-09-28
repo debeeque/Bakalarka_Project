@@ -1,0 +1,16 @@
+% Разрядный тест аккумулятора (русская версия рис. 3.16)
+\begin{tikzpicture}
+    \begin{axis}[
+        width=0.8\textwidth, height=5.8cm,
+        xlabel={время работы от аккумулятора [ч]},
+        ylabel={напряжение последовательных ячеек [В]},
+        xmin=0, xmax=7, ymin=9.4, ymax=12.6,
+        xtick={0,1,2,3,4,5,6,7},
+        grid=major, grid style={gray!25},
+        tick label style={font=\footnotesize}, label style={font=\small}]
+        \addplot[thick] table[x=h, y=v] {../Figures/data/discharge.csv};
+        \draw[dashed] (axis cs:0,9.6) -- (axis cs:7,9.6);
+        \node[anchor=south west, font=\footnotesize] at (axis cs:0.1,9.6) {порог отключения 9,6 В};
+        \node[anchor=south west, font=\footnotesize, align=left] at (axis cs:0.3,10.05) {отключение через 6~ч 43~мин\\отдано 28,2~Вт·ч};
+    \end{axis}
+\end{tikzpicture}

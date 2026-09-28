@@ -1,0 +1,49 @@
+\chapter{Исходные коды измерительных скриптов}
+\label{sec:Appendix1}
+
+В оригинале работы (приложение A) напечатаны исходные коды семи ключевых скриптов: \texttt{setup\_network.sh}, \texttt{sniff\_stats.py}, \texttt{pkt\_gen.py}, \texttt{perf\_test.py}, \texttt{ra\_audit.py}, \texttt{neigh\_scan.py} и \texttt{arp\_scan.py}. В этом переводе коды не повторяются: они одинаковы в обеих версиях и лежат в папке \texttt{SourceCodes/} проекта.
+
+\chapter{Обзор программного обеспечения прибора}
+\label{sec:Appendix2}
+
+Программное обеспечение хранится в каталоге \texttt{\textasciitilde/diploma\_project/} на карте памяти прибора; системные файлы лежат в обычных местах системы. Полные исходные коды всех файлов входят в электронное приложение к работе. Обзор приведён в таблице \ref{tab:soubory}; скрипты, напечатанные в приложении A оригинала, отмечены звёздочкой.
+
+\begin{table}[htbp]
+    \caption{Файлы программного обеспечения прибора}
+    \label{tab:soubory}
+    \centering
+    \small
+    \begin{tabular}{lp{9.5cm}}
+        \hline
+        Файл & Назначение \\
+        \hline
+        \multicolumn{2}{l}{\textit{Измерительные скрипты, запускаются в пространстве имён порта}} \\
+        \texttt{setup\_network.sh}* & подготовка портов, пространств имён и сервера dnsmasq \\
+        \texttt{sniff\_stats.py}* & анализатор трафика, статистика, сохранение в pcap и CSV \\
+        \texttt{pktdecode.py} & разбор заголовков кадра без Scapy, для статистики и для разбора по слоям \\
+        \texttt{pkt\_gen.py}* & генератор пакетов шести типов \\
+        \texttt{perf\_test.py}* & измерения iperf3 и развёртка по размерам кадра \\
+        \texttt{perf\_server.py} & сервер iperf3 на выбранном порту \\
+        \texttt{path\_test.py} & тест доступности и задержки утилитой ping \\
+        \texttt{targets.py} & общий поиск цели и объяснение, почему цели нет \\
+        \texttt{ra\_audit.py}* & аудит сообщений Router Advertisement \\
+        \texttt{neigh\_scan.py}* & поиск соседей IPv6 \\
+        \texttt{arp\_scan.py}* & сканирование ARP \\
+        \multicolumn{2}{l}{\textit{Управляющее приложение}} \\
+        \texttt{gui\_app.py} & главный экран, запуск задач, экран приветствия и блокировки \\
+        \texttt{ui\_kit.py} & общий вид экранов, строка состояния, кнопки \\
+        \texttt{screens.py} & экраны PATH, SCAN, IPv6, DHCP / RA и SYSTEM \\
+        \texttt{traffic.py} & экран TRAFFIC с разбором кадра и фильтрами \\
+        \texttt{generator.py} & экран GENERATOR \\
+        \texttt{speed.py} & экран SPEED с развёрткой и режимом сервера \\
+        \texttt{results.py} & сохранение результатов в файлы JSON \\
+        \texttt{wifi\_dialog.py} & подключение к сети Wi-Fi и клавиатура на экране \\
+        \multicolumn{2}{l}{\textit{Системные службы}} \\
+        \texttt{port\_status.py} & слежение за состоянием портов и запись в файл состояния \\
+        \texttt{ups\_monitor.py} & измерение состояния аккумулятора и штатное выключение при разряде \\
+        \texttt{analyzer-port@.service} & подготовка порта при подключении адаптера \\
+        \texttt{10-analyzer-*.link} & постоянные имена портов по физическому адресу \\
+        \texttt{\textasciitilde/.xinitrc} & запуск управляющего приложения вместо рабочего стола \\
+        \hline
+    \end{tabular}
+\end{table}

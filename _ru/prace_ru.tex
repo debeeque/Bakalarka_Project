@@ -1,0 +1,58 @@
+% Рабочий перевод бакалаврской работы на русский язык — только для автора.
+% Не для сдачи: сдаётся чешский оригинал BachelorThesis.tex.
+% Соответствует редакции оригинала от 28.09.2026. Сборка: lualatex + biber
+% (latexmk -lualatex prace_ru.tex в этой папке).
+\documentclass[a4paper,11pt]{report}
+
+\usepackage[english,russian]{babel}
+\babelfont{rm}{Times New Roman}
+\babelfont{sf}{Arial}
+\babelfont{tt}[Scale=0.88]{Consolas}
+\usepackage[a4paper,margin=2.5cm]{geometry}
+\usepackage{graphicx}
+\graphicspath{{../}}
+\usepackage{amsmath}
+\usepackage{caption}
+\usepackage{tikz}
+\usetikzlibrary{fit,arrows.meta}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage[autostyle=true]{csquotes}
+\usepackage[backend=biber,style=numeric,sorting=none]{biblatex}
+\addbibresource{../literature.bib}
+\usepackage[hidelinks]{hyperref}
+\setlength{\emergencystretch}{2em}
+\setlength{\parskip}{0.3em}
+
+\title{Переносное устройство для тестирования и мониторинга сетей\\[0.5em]
+\large Рабочий перевод бакалаврской работы на русский язык\\
+(оригинал: Přenosné zařízení pro testování a monitorování sítí)}
+\author{Михаил Муканов\\ VŠB -- Technická univerzita Ostrava, FEI\\ Руководитель: Ing. Pavel Nevlud}
+\date{Редакция от 28.09.2026}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Эта бакалаврская работа посвящена проектированию и реализации переносного устройства для тестирования и мониторинга компьютерных сетей. Устройство построено на одноплатном компьютере Raspberry Pi с сенсорным дисплеем, двумя внешними сетевыми адаптерами и аккумуляторным модулем и управляется без подключённого компьютера. Оба тестовых порта логически разделены пространствами имён ядра Linux, поэтому прибор может одним портом генерировать трафик, а другим независимо его анализировать. Устройство содержит анализатор трафика протоколов IPv4 и IPv6 со статистикой, разбором кадров и фильтрами, которые выполняются в ядре, генератор пакетов, измерение задержки, пропускной способности, потерь и джиттера инструментом iperf3, включая развёртку по размерам кадра, аудит сообщений Router Advertisement и поиск соседей IPv6. Точность анализатора проверена независимым пересчётом захваченного трафика, измерения проведены и на перемычке между портами, и против компьютеров с Linux и Windows. В работе очерчены и пределы использованной платформы, прежде всего пропускная способность, ограниченная шиной USB 2.0 примерно 276 Мбит/с. В типичном режиме прибор работает от аккумулятора почти семь часов.
+
+\medskip
+\noindent\textbf{Ключевые слова:} компьютерные сети; мониторинг сети; генерирование трафика; анализатор трафика; Raspberry Pi; network namespaces; IPv4; IPv6; пропускная способность; потери пакетов.
+\end{abstract}
+
+\tableofcontents
+\listoffigures
+\listoftables
+
+\input{uvod.tex}
+\input{teorie.tex}
+\input{realizace.tex}
+\input{zaver.tex}
+
+\printbibliography[title={Литература}, heading=bibintoc]
+
+\appendix
+\input{prilohy.tex}
+
+\end{document}
