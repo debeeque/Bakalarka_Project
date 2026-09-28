@@ -1038,6 +1038,10 @@ Figures/                   ← изображения
 SourceCodes/               ← коды устройства для приложений
   system/                  ← unit-файлы systemd, конфиг NetworkManager, xinitrc (LF!)
   assets/                  ← фон приветственного экрана
+_ru/                       ← рабочий перевод работы на русский для автора (не для
+                             сдачи): prace_ru.tex + главы, lualatex + biber,
+                             шрифты Windows (Times New Roman); prace_ru.pdf в git.
+                             При правках чешского текста — обновлять и перевод
 diploma.cls, diplomalst.sty← шаблон FEI VŠB
 biblatex-examples.bib      ← ВРЕМЕННО: мусор из шаблона, заменить на literature.bib
 _context/
