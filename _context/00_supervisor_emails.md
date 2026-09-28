@@ -267,6 +267,87 @@ Mikhail Mukanov
 
 ---
 
+## Исходящее письмо, 28.09.2026 — черновик: новая редакция, планы, два вопроса
+
+Составлено в Claude Code по просьбе пользователя; отправляет он сам (с
+приложенным `BachelorThesis.pdf`, 2,5 МБ). Вопросов два, чтобы не загружать:
+электронные приложения и проверка AutoTest в сети EB215 (полный список
+вопросов про лабораторию — в `16_brief_pismo_eb215.md`, в письмо вошли главные).
+
+```
+Dobrý den,
+
+posílám Vám aktuální verzi své bakalářské práce a krátce shrnuji,
+co se od začátku září podařilo.
+
+Zařízení:
+
+- Napájení: přístroj pracuje z akumulátorového modulu se třemi články
+  18650. Nejprve jsem změřil spotřebu v šesti provozních režimech, podle
+  ní zvolil kapacitu a vybíjecí zkouškou ověřil výdrž: 6 h 43 min
+  v typickém provozu. Stav baterie se zobrazuje na displeji a při vybití
+  se zařízení samo řádně vypne.
+
+- Zařízení se po zapnutí spustí rovnou do vlastní aplikace, bez pracovní
+  plochy. Rozhraní jsem přepracoval na hlavní obrazovku s dlaždicemi,
+  každá funkce má svou obrazovku; i připojení k Wi-Fi se ovládá
+  z displeje.
+
+- Analyzátor provozu: statistiky v reálném čase (pakety a bity za sekundu,
+  podíl protokolů, nejaktivnější stanice), rozbor jednotlivých rámců,
+  filtry vyhodnocované v jádře (BPF) a ukládání do pcap a CSV. Přesnost
+  jsem ověřil nezávislým přepočtem zachyceného provozu a porovnáním
+  s Wiresharkem (tshark).
+
+- Generátor paketů: jeden port odesílá zvolený typ paketů, druhý port je
+  ve vlastním jmenném prostoru počítá.
+
+- Měření: vedle TCP nově UDP se ztrátovostí a jitterem, rozmítání
+  velikostí rámce podle RFC 2544 a režim serveru.
+
+- Vše jsem ověřil i proti notebooku s Windows. TCP dosahuje 274 až
+  276 Mbit/s (strop sběrnice USB 2.0 u Raspberry Pi 3B+). Zjistil jsem
+  také, že UDP provoz přicházející v dávkách zahazuje už USB/LAN adaptér
+  zařízení; v práci to uvádím jako omezení přístroje.
+
+Text:
+
+- Do teoretické části jsem doplnil samostatnou podkapitolu o generování
+  síťového provozu (bod 1 zadání).
+- Praktickou část jsem přepsal podle současného stavu zařízení, včetně
+  tabulek a grafů z měření.
+- Podle Vaší připomínky jsem všechny fotografie obrazovky nahradil
+  snímky přímo ze zařízení. PDF má nyní 2,5 MB místo původních 49 MB.
+- Rozsah od Úvodu po Závěr je 34 stran.
+
+Plány do dalších měsíců: krabička z 3D tisku (s Ing. Hejdukem se ozvu,
+jakmile budu mít model), dále automatický test síťové zásuvky jedním
+tlačítkem (linka, DHCP, IPv6 RA, výchozí brána, DNS), zjištění
+vlastností portu (rychlost, duplex, LLDP/CDP, VLAN), test Path MTU
+a export výsledků na USB flash disk.
+
+Chtěl bych se zeptat na dvě věci:
+
+1. Zdrojové kódy: v přílohách mám nyní vytištěné jen klíčové měřicí
+   skripty (asi 40 stran) a tabulku všech souborů. Celý kód by vydal
+   zhruba na 100 stran. Je lepší přiložit kompletní kód jako archiv
+   v EDISONu, uvést odkaz na repozitář, nebo vše vytisknout do příloh?
+
+2. Automatický test zásuvky bych rád ověřil i ve skutečné síti, ideálně
+   v laboratoři EB215. Zařízení by po připojení do zásuvky vyslalo dotaz
+   DHCP DISCOVER (bez převzetí adresy), zprávu Router Solicitation, ping
+   na výchozí bránu a jeden dotaz DNS; zátěžové testy by tam nespouštělo.
+   Bylo by to možné? A nevíte, zda přepínače v laboratoři posílají
+   LLDP nebo CDP?
+
+V příloze posílám aktuální verzi práce. Budu rád za jakékoli připomínky.
+
+S pozdravem,
+Mikhail Mukanov
+```
+
+---
+
 ## Входящее письмо, 09.09.2026 (понедельник 12:47) — ответ Nevlud'а
 
 Ответ на письмо от 09.09.2026. Перенос на 2027 и продолжение руководства
