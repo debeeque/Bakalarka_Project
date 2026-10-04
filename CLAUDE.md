@@ -1081,6 +1081,13 @@ _ru/                       ← рабочий перевод работы на �
                              сдачи): prace_ru.tex + главы, lualatex + biber,
                              шрифты Windows (Times New Roman); prace_ru.pdf в git.
                              При правках чешского текста — обновлять и перевод
+_manual/                   ← руководство к прибору для автора (05.10.2026, по его
+                             просьбе): все экраны и кнопки простыми словами, план
+                             проверки в EB215, сценарий показа Nevlud'у, вопросы,
+                             словарик. manual_ru.tex (lualatex, Arial), снимки scrot
+                             с прибора в shots/, выноски в ann/ (annotate.py +
+                             marks.json, рисуются на малине — там есть PIL);
+                             manual_ru.pdf в git. При изменении GUI — переснять
 diploma.cls, diplomalst.sty← шаблон FEI VŠB
 biblatex-examples.bib      ← ВРЕМЕННО: мусор из шаблона, заменить на literature.bib
 _context/
