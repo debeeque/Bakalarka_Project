@@ -16,6 +16,7 @@ from screens import (DhcpScreen, FunctionScreen, Ipv6Screen, KeypadScreen, PathS
                      TargetScreen)
 from speed import SpeedScreen, SweepScreen
 from generator import GeneratorScreen
+from port import PortScreen
 from traffic import FilterScreen, HostScreen, PacketScreen, PausedScreen, TrafficScreen
 
 BASE_DIR = "/home/muk0015/diploma_project"
@@ -34,7 +35,7 @@ TILES = [
     ("TRAFFIC", "live capture, protocols, top talkers, PCAP", "#00ACC1", TrafficScreen),
     ("GENERATOR", "ICMP, ICMPv6, UDP, TCP SYN, ARP, RS", "#00ACC1", GeneratorScreen),
     ("SPEED", "iperf3 TCP and UDP, sweep, server", "#1E88E5", SpeedScreen),
-    ("PORT", "speed, duplex, partner modes, LLDP, VLAN", "#43A047", None),
+    ("PORT", "speed, duplex, partner modes, LLDP, VLAN", "#43A047", PortScreen),
     ("SCAN", "ARP, IPv6 neighbours, Nmap", "#43A047", ScanScreen),
     ("IPv6", "Router Advertisement audit", "#43A047", Ipv6Screen),
     ("PATH", "ping IPv4 and IPv6", "#1E88E5", PathScreen),
