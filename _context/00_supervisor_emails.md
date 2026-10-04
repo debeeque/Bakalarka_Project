@@ -393,12 +393,8 @@ děkuji za odpověď a za zhodnocení.
 Zdrojové kódy tedy přiložím do EDISONu jako přílohu, která se netiskne.
 
 Do laboratoře se s prototypem rád přijdu ukázat. Mohl bych v úterý
-6. 10. po 16:00, kdy budu ve škole, nebo ve čtvrtek 8. 10. zhruba
+6. 10. po 16:00, kdy budu na univerzitě, nebo ve čtvrtek 8. 10. zhruba
 od 13:00. Který termín by Vám vyhovoval?
-
-Za tip se switchi v racku děkuji. LLDP/CDP a automatický test zásuvky
-bych v laboratoři vyzkoušel, až budou příslušné funkce hotové; termín
-bych pak domluvil zvlášť.
 
 S pozdravem,
 Mikhail Mukanov
