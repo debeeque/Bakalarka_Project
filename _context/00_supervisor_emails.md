@@ -348,6 +348,62 @@ Mikhail Mukanov
 
 ---
 
+## Входящее письмо, после 28.09.2026 — ответ Nevlud'а на редакцию 28.09
+
+Письмо 28.09 ушло 28.09 в 18:09 в том виде, что выше (с приложенным PDF).
+
+```
+Dobry den,
+
+ok, obrazky vypadaji mnohem lepe, super.
+Rozsah prace 34 stranek, je take optimalni.
+ad.1. Nejlepe vlozit do Edisonu jako priloha, ktera se netiskne.
+ad.2. Ano je mozne otestovat v laboratori. Osobne si myslim, ze v laboratori
+je vypnute CDP i LLDP. Ale dalo by se to vyzkouset na switchich v racku
+(Mikrotik, nebo Cisco).
+
+Take bych se rad podival na Vas prototyp primo v laboratori. Dejte mi potom
+vedet, kdy tam budete.
+
+S pozdravem,
+Pavel Nevlud
+```
+
+**Что это значит:**
+- Рисунки приняты («mnohem lepe»), объём 34 страницы «optimální» — текст в
+  нынешнем виде его устраивает.
+- **Исходники — в EDISON как нетиражируемое приложение** («příloha, která se
+  netiskne»). В приложении B уже так и написано («součástí elektronické
+  přílohy práce»); при сдаче собрать архив `SourceCodes/` (+ `system/`).
+- **Тест в EB215 разрешён.** По его мнению, CDP и LLDP в лаборатории
+  выключены; попробовать можно на коммутаторах в стойке (MikroTik или Cisco).
+  Это закрывает вопрос решения от 03.08 «LLDP перед реализацией проверить»:
+  для П3.2 стенд — коммутатор из стойки, а не розетка.
+- **Хочет посмотреть прототип в лаборатории** — назначить встречу.
+
+## Исходящее письмо, 04.10.2026 — ответ: встреча в лаборатории
+
+Пользователь в университете во вторник после 16:00 или в четверг от 13:00.
+
+```
+Dobrý den,
+
+děkuji za odpověď a za zhodnocení.
+
+Zdrojové kódy tedy přiložím do EDISONu jako přílohu, která se netiskne.
+
+Do laboratoře se s prototypem rád přijdu ukázat. Mohl bych v úterý
+6. 10. po 16:00, kdy budu ve škole, nebo ve čtvrtek 8. 10. zhruba
+od 13:00. Který termín by Vám vyhovoval?
+
+Za tip se switchi v racku děkuji. LLDP/CDP a automatický test zásuvky
+bych v laboratoři vyzkoušel, až budou příslušné funkce hotové; termín
+bych pak domluvil zvlášť.
+
+S pozdravem,
+Mikhail Mukanov
+```
+
 ## Входящее письмо, 09.09.2026 (понедельник 12:47) — ответ Nevlud'а
 
 Ответ на письмо от 09.09.2026. Перенос на 2027 и продолжение руководства
