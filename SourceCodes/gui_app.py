@@ -160,6 +160,8 @@ class AnalyzerApp:
         elif hasattr(s, "shown"):
             s.shown()
         s.bar.draw(self.status)
+        if hasattr(s, "port_labels"):
+            s.port_labels(self.port_state().get("ports", {}))
 
     def note(self, tile, word, text, rest):
         self.notes[tile] = (word, text, rest)
@@ -333,6 +335,9 @@ class AnalyzerApp:
                 rows.append((port, "%s, %s" % (p.get("mac"), ", ".join(p.get("addr4", [])) or "no IPv4")))
             else:
                 rows.append((port, "adapter not plugged in"))
+        spare = st.get("spare", [])
+        if spare:
+            rows.append(("Spare", "%s, not used" % ", ".join(a["mac"] for a in spare)))
         return rows
 
     def tick(self):
@@ -341,6 +346,8 @@ class AnalyzerApp:
                        "ssid": self.ssid, "time": time.strftime("%H:%M"), "battery": self.battery_level()}
         if self.current in self.screens:
             self.screens[self.current].bar.draw(self.status)
+            if hasattr(self.screens[self.current], "port_labels"):
+                self.screens[self.current].port_labels(self.status["ports"])
         if self.current == "HOME":
             self.refresh_tiles()
         self.root.after(2000, self.tick)

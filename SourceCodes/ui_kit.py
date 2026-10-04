@@ -168,6 +168,15 @@ class Screen(tk.Frame):
         if self.has_ports:
             self.select_port(self.port)
 
+    # The MAC tail printed on the adapter's sticker, read from the adapter itself
+    def port_labels(self, ports):
+        for name, b in self.port_buttons.items():
+            p = ports.get(name, {})
+            mac = p.get("mac") if p.get("present") else None
+            text = "%s\n%s" % ("MON" if name == "mon0" else "SND", mac[-5:] if mac else "--")
+            if b.cget("text") != text:
+                b.config(text=text)
+
     def select_port(self, name):
         self.port = name
         for n, b in self.port_buttons.items():
