@@ -119,12 +119,8 @@ def verdict(r):
     return level, ", ".join(words)
 
 
-def main():
-    ap = argparse.ArgumentParser(description="Link diagnostics of a test port (reads the adapter, sends nothing)")
-    ap.add_argument("iface")
-    args = ap.parse_args()
-    iface = args.iface
-
+def read(iface, keep=True):
+    """keep: store the counters as the base for the next "new since last check"."""
     r = {"iface": iface, "present": os.path.exists(SYSFS % (iface, "")), "link": False, "speed": None,
          "duplex": None, "autoneg": None, "advertised": [], "partner": [], "partner_autoneg": None,
          "partner_pause": None, "best_common": None, "driver": None, "firmware": None, "bus": None,
@@ -132,9 +128,7 @@ def main():
          "errors_new": None, "missed_new": None}
     if not r["present"]:
         r["verdict"], r["short"] = verdict(r)
-        print("%s: no such interface in this namespace" % iface)
-        print("RESULT port_info " + json.dumps(r))
-        return 2
+        return r
 
     settings, info, stats = ethtool(iface)
     r["link"] = bool(settings.get("link-detected", sysfs(iface, "carrier") == "1"))
@@ -165,10 +159,22 @@ def main():
     r["errors_new"] = sum(d for d in new_errors if d)
     # r8152 keeps rx_missed in 16 bits
     r["missed_new"] = delta(counters, last, "rx_missed", wrap=65536)
-    store(iface, counters)
-
+    if keep:
+        store(iface, counters)
     r["verdict"], r["short"] = verdict(r)
-    print("Port      : %s (%s, %s, firmware %s)" % (iface, r["mac"], r["driver"], r["firmware"]))
+    return r
+
+
+def main():
+    ap = argparse.ArgumentParser(description="Link diagnostics of a test port (reads the adapter, sends nothing)")
+    ap.add_argument("iface")
+    args = ap.parse_args()
+    r = read(args.iface)
+    if not r["present"]:
+        print("%s: no such interface in this namespace" % args.iface)
+        print("RESULT port_info " + json.dumps(r))
+        return 2
+    print("Port      : %s (%s, %s, firmware %s)" % (r["iface"], r["mac"], r["driver"], r["firmware"]))
     if r["link"]:
         print("Link      : up, %s Mb/s, %s duplex, autoneg %s" % (r["speed"], r["duplex"], "on" if r["autoneg"] else "off"))
         print("This port : %s" % short_modes(r["advertised"]))

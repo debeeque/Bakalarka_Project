@@ -22,3 +22,4 @@ SourceCodes/system/* text eol=lf
 *.JPG binary
 *.png binary
 *.icm binary
+SourceCodes/profiles/* text eol=lf

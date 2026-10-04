@@ -17,6 +17,7 @@ from screens import (DhcpScreen, FunctionScreen, Ipv6Screen, KeypadScreen, PathS
 from speed import SpeedScreen, SweepScreen
 from generator import GeneratorScreen
 from port import PortScreen
+from autotest_screen import AutotestLogScreen, AutotestScreen
 from traffic import FilterScreen, HostScreen, PacketScreen, PausedScreen, TrafficScreen
 
 BASE_DIR = "/home/muk0015/diploma_project"
@@ -31,7 +32,7 @@ if os.path.exists(BASE_DIR):
     os.chdir(BASE_DIR)
 
 TILES = [
-    ("AUTOTEST", "link, DHCP, IPv6, gateway, DNS, targets", "#1E88E5", None),
+    ("AUTOTEST", "link, DHCP, IPv6, gateway, DNS, targets", "#1E88E5", AutotestScreen),
     ("TRAFFIC", "live capture, protocols, top talkers, PCAP", "#00ACC1", TrafficScreen),
     ("GENERATOR", "ICMP, ICMPv6, UDP, TCP SYN, ARP, RS", "#00ACC1", GeneratorScreen),
     ("SPEED", "iperf3 TCP and UDP, sweep, server", "#1E88E5", SpeedScreen),
@@ -45,7 +46,8 @@ TILES = [
     ("SYSTEM", "Wi-Fi, lock, desktop, power off", "#78909C", SystemScreen),
 ]
 PAGES = {"TARGET": TargetScreen, "KEYPAD": KeypadScreen, "PAUSED": PausedScreen, "PACKET": PacketScreen,
-         "FILTER": FilterScreen, "HOSTS": HostScreen, "SWEEP": SweepScreen}
+         "FILTER": FilterScreen, "HOSTS": HostScreen, "SWEEP": SweepScreen,
+         "AUTOTEST_LOG": AutotestLogScreen}
 
 
 class AnalyzerApp:
