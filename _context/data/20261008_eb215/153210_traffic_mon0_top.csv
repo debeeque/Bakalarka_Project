@@ -1,0 +1,12 @@
+# sniff_stats mon0 top talkers and ports; separator ';', integers only
+kind;rank;address_or_port;service;bytes;packets
+talker;1;158.196.20.15;;259054;255
+talker;2;158.196.20.181;;29896;367
+talker;3;158.196.20.182;;29568;363
+talker;4;158.196.20.214;;29404;361
+talker;5;158.196.20.198;;29240;359
+port;1;udp/1947;;;4850
+port;2;udp/5353;mdns;;322
+port;3;udp/546;dhcpv6-client;;7
+port;4;udp/5678;;;6
+port;5;udp/5355;;;4
