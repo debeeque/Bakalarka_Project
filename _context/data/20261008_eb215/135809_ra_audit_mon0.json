@@ -1,0 +1,41 @@
+{
+ "script": "ra_audit.py",
+ "port": "mon0",
+ "time": "2026-10-08T13:58:09+02:00",
+ "ntp_synchronized": true,
+ "script_md5": "be25b8ec796f65e0785e70ef47af740e",
+ "result": {
+  "verdict": "WARN",
+  "routers": 1,
+  "foreign": 1,
+  "alerts": 2,
+  "output": [
+   "=== IPv6 Router Advertisement audit ===",
+   "Interface    : mon0 (00:e0:4c:68:02:01)",
+   "Link-local   : fe80::2e0:4cff:fe68:201",
+   "Own MACs     : 00:e0:4c:68:02:01, 00:e0:4c:68:02:23",
+   "Solicitation : sent to ff02::2 from fe80::2e0:4cff:fe68:201",
+   "Routers      : 1",
+   "",
+   "--- Router 1 [FOREIGN] ---",
+   "Source       : fe80::72da:48ff:fec9:c95f",
+   "Source MAC   : 70:da:48:c9:c9:5f",
+   "RA received  : 1",
+   "Cur hop limit: 64",
+   "Flags        : M=0 O=0   preference=High",
+   "Router life  : 1800 s",
+   "Reachable    : 0 ms   Retrans: 0 ms",
+   "Src LL addr  : 70:da:48:c9:c9:5f",
+   "MTU          : 9216",
+   "Prefix       : 2001:718:1001:2c8::/64   L=1 A=1 R=0",
+   "               valid 2592000 s, preferred 604800 s",
+   "Audit:",
+   "  [ALERT] router is not this device, possible rogue RA",
+   "",
+   "--- Segment summary ---",
+   "Sent by this port : 0",
+   "Heard on the wire : 1, of them foreign 1",
+   "  [ALERT] unknown router fe80::72da:48ff:fec9:c95f at 70:da:48:c9:c9:5f"
+  ]
+ }
+}

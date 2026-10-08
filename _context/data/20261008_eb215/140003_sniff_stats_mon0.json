@@ -1,0 +1,123 @@
+{
+ "script": "sniff_stats.py",
+ "port": "mon0",
+ "time": "2026-10-08T14:00:03+02:00",
+ "ntp_synchronized": true,
+ "script_md5": "5cb57748eb673f490b27c6da2d4a63e2",
+ "result": {
+  "iface": "mon0",
+  "bpf": "",
+  "start": "2026-10-08T13:58:42+02:00",
+  "duration_s": 81.0,
+  "packets": 1131,
+  "bytes": 138651,
+  "avg": 123,
+  "pps_avg": 14,
+  "bps_avg": 13687,
+  "hosts": 17,
+  "cats": {
+   "TCP": [
+    0,
+    0
+   ],
+   "UDP": [
+    345,
+    86443
+   ],
+   "ICMP": [
+    0,
+    0
+   ],
+   "ICMPv6": [
+    78,
+    9692
+   ],
+   "ARP": [
+    12,
+    720
+   ],
+   "other": [
+    696,
+    41796
+   ]
+  },
+  "fam": {
+   "4": 336,
+   "6": 91
+  },
+  "top": [
+   [
+    "158.196.20.15",
+    59306,
+    56
+   ],
+   [
+    "158.196.20.189",
+    5920,
+    73
+   ],
+   [
+    "158.196.20.173",
+    5756,
+    71
+   ],
+   [
+    "158.196.20.193",
+    5756,
+    71
+   ],
+   [
+    "158.196.20.198",
+    5756,
+    71
+   ]
+  ],
+  "ports": [
+   [
+    "udp",
+    1947,
+    "",
+    274
+   ],
+   [
+    "udp",
+    5353,
+    "mdns",
+    67
+   ],
+   [
+    "udp",
+    546,
+    "dhcpv6-client",
+    2
+   ],
+   [
+    "udp",
+    5678,
+    "",
+    2
+   ]
+  ],
+  "tcpdump": {
+   "captured": 1131,
+   "received": 1141,
+   "dropped": 0
+  },
+  "pcap": {
+   "path": "/tmp/traffic/mon0.pcap",
+   "bytes": 156771,
+   "packets": 1131,
+   "full": false
+  },
+  "offload": {
+   "before": {
+    "tso": "on",
+    "gso": "on",
+    "gro": "on"
+   },
+   "disabled": true
+  },
+  "stopped": "signal",
+  "aborted": false
+ }
+}

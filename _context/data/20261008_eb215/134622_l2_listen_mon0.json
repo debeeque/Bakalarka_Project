@@ -1,0 +1,28 @@
+{
+ "script": "l2_listen.py",
+ "port": "mon0",
+ "time": "2026-10-08T13:46:22+02:00",
+ "ntp_synchronized": true,
+ "script_md5": "9124a7232f08d30a3fb5253b2a0ac1b8",
+ "result": {
+  "iface": "mon0",
+  "timeout_s": 0.0,
+  "listened_s": 0,
+  "aborted": false,
+  "stopped_early": false,
+  "hello": {
+   "chassis_id": "00:e0:4c:68:02:01",
+   "port_id": "mon0",
+   "ttl": 120,
+   "system_name": "raspberrypi",
+   "mgmt": "10.0.1.10"
+  },
+  "frames": 0,
+  "neighbors": [],
+  "stp": [],
+  "lacp": [],
+  "vlans": {},
+  "verdict": "INFO",
+  "short": "LLDP hello sent from mon0"
+ }
+}

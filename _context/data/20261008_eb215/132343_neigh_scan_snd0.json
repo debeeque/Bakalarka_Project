@@ -1,0 +1,33 @@
+{
+ "script": "neigh_scan.py",
+ "port": "snd0",
+ "time": "2026-10-08T13:23:43+02:00",
+ "ntp_synchronized": true,
+ "script_md5": "c04229fc2b2d1d9a0f0f31e9703032d6",
+ "result": {
+  "verdict": "INFO",
+  "neighbours": 1,
+  "target4": null,
+  "target6": null,
+  "output": [
+   "=== IPv6 neighbour enumeration ===",
+   "Interface    : snd0 (00:e0:4c:68:02:23)",
+   "Link-local   : fe80::2e0:4cff:fe68:223",
+   "Prefixes     : fd00:2::/64",
+   "Probe        : 3 echo requests to ff02::1",
+   "Neighbours   : 1",
+   "",
+   "--- Neighbour 1 [OWN DEVICE] ---",
+   "MAC          : 00:e0:4c:68:02:01",
+   "Link-local   : fe80::2e0:4cff:fe68:201",
+   "IID from MAC : 02e0:4cff:fe68:0201",
+   "Addressing   : EUI-64, link-local matches the MAC",
+   "SLAAC in fd00:2::/64 : fd00:2::2e0:4cff:fe68:201  (no answer)",
+   "",
+   "TARGET6      : none",
+   "Scanning 10.0.2.0/24 on snd0...",
+   "Found 0 devices:",
+   "TARGET4: none"
+  ]
+ }
+}

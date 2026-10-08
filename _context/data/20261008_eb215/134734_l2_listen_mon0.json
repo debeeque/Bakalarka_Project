@@ -1,0 +1,22 @@
+{
+ "script": "l2_listen.py",
+ "port": "mon0",
+ "time": "2026-10-08T13:47:34+02:00",
+ "ntp_synchronized": true,
+ "script_md5": "9124a7232f08d30a3fb5253b2a0ac1b8",
+ "result": {
+  "iface": "mon0",
+  "timeout_s": 65.0,
+  "listened_s": 65.0,
+  "aborted": false,
+  "stopped_early": false,
+  "hello": null,
+  "frames": 0,
+  "neighbors": [],
+  "stp": [],
+  "lacp": [],
+  "vlans": {},
+  "verdict": "INFO",
+  "short": "no LLDP, CDP or STP in 65 s"
+ }
+}

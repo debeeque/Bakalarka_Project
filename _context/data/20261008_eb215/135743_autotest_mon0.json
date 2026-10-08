@@ -1,0 +1,150 @@
+{
+ "script": "autotest.py",
+ "port": "mon0",
+ "time": "2026-10-08T13:57:43+02:00",
+ "ntp_synchronized": true,
+ "script_md5": "d7698b300eae3665292d1ef5eb2a95f6",
+ "result": {
+  "iface": "mon0",
+  "profile": "default",
+  "lease_taken": false,
+  "aborted": false,
+  "seconds": 6.0,
+  "verdict": "FAIL",
+  "short": "DHCPv4: no DHCP server answered in 4 s",
+  "steps": [
+   {
+    "step": "LINK",
+    "verdict": "PASS",
+    "line1": "100 Mb/s full duplex, autoneg on",
+    "line2": "partner 100F 100H 10F 10H",
+    "ms": 20,
+    "port": {
+     "iface": "mon0",
+     "present": true,
+     "link": true,
+     "speed": 100,
+     "duplex": "Full",
+     "autoneg": true,
+     "advertised": [
+      "10baseT/Half",
+      "10baseT/Full",
+      "100baseT/Half",
+      "100baseT/Full",
+      "1000baseT/Full"
+     ],
+     "partner": [
+      "10baseT/Half",
+      "10baseT/Full",
+      "100baseT/Half",
+      "100baseT/Full"
+     ],
+     "partner_autoneg": true,
+     "partner_pause": "No",
+     "best_common": [
+      100,
+      "Full"
+     ],
+     "driver": "r8152",
+     "firmware": "rtl8153a-2 v1 10/23/19",
+     "bus": "usb-3f980000.usb-1.1.3",
+     "mac": "00:e0:4c:68:02:01",
+     "mtu": 1500,
+     "carrier_down_count": 4,
+     "drops_new": 0,
+     "counters": {
+      "rx_errors": 0,
+      "tx_errors": 0,
+      "rx_crc_errors": 0,
+      "rx_frame_errors": 0,
+      "rx_length_errors": 0,
+      "rx_over_errors": 0,
+      "rx_dropped": 1730,
+      "tx_dropped": 0,
+      "collisions": 0,
+      "rx_missed": 0,
+      "align_errors": 0,
+      "carrier_down_count": 4
+     },
+     "errors_new": 0,
+     "missed_new": 0,
+     "verdict": "PASS",
+     "short": "100 Mb/s full duplex"
+    }
+   },
+   {
+    "step": "DHCPv4",
+    "verdict": "FAIL",
+    "line1": "no DHCP server answered in 4 s",
+    "line2": "",
+    "ms": 4355,
+    "offers": []
+   },
+   {
+    "step": "IPv6",
+    "verdict": "PASS",
+    "line1": "RA: prefix 2001:718:1001:2c8::/64 A=1",
+    "line2": "SLAAC address 2001:718:1001:2c8:2e0:4cff:fe68:201",
+    "ms": 1162,
+    "router": "fe80::72da:48ff:fec9:c95f",
+    "router_mac": "70:da:48:c9:c9:5f",
+    "origin": "FOREIGN",
+    "M": 0,
+    "O": 0,
+    "lifetime_s": 1800,
+    "prefixes": [
+     {
+      "prefix": "2001:718:1001:2c8::/64",
+      "A": 1,
+      "L": 1
+     }
+    ],
+    "dns": [],
+    "routers": 1,
+    "notes": [
+     [
+      "ALERT",
+      "router is not this device, possible rogue RA"
+     ]
+    ],
+    "slaac": [
+     "2001:718:1001:2c8:2e0:4cff:fe68:201"
+    ]
+   },
+   {
+    "step": "GATEWAY",
+    "verdict": "PASS",
+    "line1": "fe80::72da:48ff:fec9:c95f: 3/3, 1.0 ms",
+    "line2": "",
+    "ms": 414,
+    "v6": {
+     "gateway": "fe80::72da:48ff:fec9:c95f",
+     "received": 3,
+     "sent": 3,
+     "rtt_avg": 0.989
+    }
+   },
+   {
+    "step": "DNS",
+    "verdict": "SKIP",
+    "line1": "no DNS server announced",
+    "line2": "DHCP and RA gave no DNS server",
+    "ms": 0
+   },
+   {
+    "step": "TARGETS",
+    "verdict": "SKIP",
+    "line1": "www.vsb.cz port 443: name not resolved",
+    "line2": "",
+    "ms": 0,
+    "targets": [
+     {
+      "host": "www.vsb.cz",
+      "port": 443,
+      "state": "not resolved"
+     }
+    ]
+   }
+  ]
+ }
+}

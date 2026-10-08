@@ -1,0 +1,17 @@
+{
+ "script": "arp_scan.py",
+ "port": "mon0",
+ "time": "2026-10-08T13:23:13+02:00",
+ "ntp_synchronized": true,
+ "script_md5": "d14aee6621ea81eca16214c087211873",
+ "result": {
+  "verdict": "INFO",
+  "hosts": [],
+  "net4": "10.0.1.0/24",
+  "output": [
+   "Scanning 10.0.1.0/24 on mon0...",
+   "Found 0 devices:",
+   "TARGET4: none"
+  ]
+ }
+}
