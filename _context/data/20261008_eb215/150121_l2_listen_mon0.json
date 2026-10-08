@@ -1,0 +1,55 @@
+{
+ "script": "l2_listen.py",
+ "port": "mon0",
+ "time": "2026-10-08T15:01:21+02:00",
+ "ntp_synchronized": true,
+ "script_md5": null,
+ "result": {
+  "iface": "mon0",
+  "timeout_s": 65.0,
+  "listened_s": 65.2,
+  "aborted": false,
+  "stopped_early": false,
+  "hello": null,
+  "frames": 37,
+  "neighbors": [
+   {
+    "proto": "CDP",
+    "ttl": 180,
+    "mgmt": [],
+    "system_name": "Switch",
+    "system_descr": "Cisco IOS Software, C3560 Software (C3560-IPSERVICESK9-M), Version 12.2(50)SE3, RELEASE SOFTWARE (fc1)?Technical Support: http://www.cisco.com/techsupport?Copyright (c) 1986-2009 by Cisco Systems, Inc.?Compiled Wed 22-Jul-09 06:41 by prod_rel_team",
+    "platform": "cisco WS-C3560-24PS",
+    "port_id": "FastEthernet0/7",
+    "vtp_domain": "",
+    "vlan": 1,
+    "duplex": "full",
+    "mac": "00:25:46:0a:ee:89",
+    "origin": "FOREIGN",
+    "at_s": 5.2
+   }
+  ],
+  "stp": [
+   {
+    "bridge": "00:25:46:0a:ee:80",
+    "root": "00:25:46:0a:ee:80",
+    "root_priority": 32769,
+    "version": "STP",
+    "from": "00:25:46:0a:ee:89",
+    "at_s": 1.0
+   }
+  ],
+  "lacp": [],
+  "vlans": {},
+  "verdict": "PASS",
+  "short": "neighbour Switch, port FastEthernet0/7, VLAN 1, TTL 180 via CDP",
+  "output": [
+   "Listening on mon0 for up to 65 s: LLDP, CDP, STP, LACP, VLAN tags; sending nothing",
+   "HEARD STP 00:25:46:0a:ee:89 FOREIGN root 00:25:46:0a:ee:80, priority 32769",
+   "HEARD CDP 00:25:46:0a:ee:89 FOREIGN Switch, port FastEthernet0/7, VLAN 1, TTL 180",
+   "Frames    : 37 in 65.2 s",
+   "Verdict   : PASS neighbour Switch, port FastEthernet0/7, VLAN 1, TTL 180 via CDP",
+   "RESULT l2_listen {\"iface\": \"mon0\", \"timeout_s\": 65.0, \"listened_s\": 65.2, \"aborted\": false, \"stopped_early\": false, \"hello\": null, \"frames\": 37, \"neighbors\": [{\"proto\": \"CDP\", \"ttl\": 180, \"mgmt\": [], \"system_name\": \"Switch\", \"system_descr\": \"Cisco IOS Software, C3560 Software (C3560-IPSERVICESK9-M), Version 12.2(50)SE3, RELEASE SOFTWARE (fc1)?Technical Support: http://www.cisco.com/techsupport?Copyright (c) 1986-2009 by Cisco Systems, Inc.?Compiled Wed 22-Jul-09 06:41 by prod_rel_team\", \"platform\": \"cisco WS-C3560-24PS\", \"port_id\": \"FastEthernet0/7\", \"vtp_domain\": \"\", \"vlan\": 1, \"duplex\": \"full\", \"mac\": \"00:25:46:0a:ee:89\", \"origin\": \"FOREIGN\", \"at_s\": 5.2}], \"stp\": [{\"bridge\": \"00:25:46:0a:ee:80\", \"root\": \"00:25:46:0a:ee:80\", \"root_priority\": 32769, \"version\": \"STP\", \"from\": \"00:25:46:0a:ee:89\", \"at_s\": 1.0}], \"lacp\": [], \"vlans\": {}, \"verdict\": \"PASS\", \"short\": \"neighbour Switch, port FastEthernet0/7, VLAN 1, TTL 180 via CDP\"}"
+  ]
+ }
+}

@@ -1,0 +1,47 @@
+{
+ "script": "l2_listen.py",
+ "port": "mon0",
+ "time": "2026-10-08T15:02:22+02:00",
+ "ntp_synchronized": true,
+ "script_md5": "9124a7232f08d30a3fb5253b2a0ac1b8",
+ "result": {
+  "iface": "mon0",
+  "timeout_s": 65.0,
+  "listened_s": 10.6,
+  "aborted": false,
+  "stopped_early": true,
+  "hello": null,
+  "frames": 6,
+  "neighbors": [
+   {
+    "proto": "CDP",
+    "ttl": 180,
+    "mgmt": [],
+    "system_name": "Switch",
+    "system_descr": "Cisco IOS Software, C3560 Software (C3560-IPSERVICESK9-M), Version 12.2(50)SE3, RELEASE SOFTWARE (fc1)?Technical Support: http://www.cisco.com/techsupport?Copyright (c) 1986-2009 by Cisco Systems, Inc.?Compiled Wed 22-Jul-09 06:41 by prod_rel_team",
+    "platform": "cisco WS-C3560-24PS",
+    "port_id": "FastEthernet0/7",
+    "vtp_domain": "",
+    "vlan": 1,
+    "duplex": "full",
+    "mac": "00:25:46:0a:ee:89",
+    "origin": "FOREIGN",
+    "at_s": 10.4
+   }
+  ],
+  "stp": [
+   {
+    "bridge": "00:25:46:0a:ee:80",
+    "root": "00:25:46:0a:ee:80",
+    "root_priority": 32769,
+    "version": "STP",
+    "from": "00:25:46:0a:ee:89",
+    "at_s": 1.5
+   }
+  ],
+  "lacp": [],
+  "vlans": {},
+  "verdict": "PASS",
+  "short": "neighbour Switch, port FastEthernet0/7, VLAN 1, TTL 180 via CDP"
+ }
+}

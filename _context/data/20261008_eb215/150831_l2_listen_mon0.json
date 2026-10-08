@@ -1,0 +1,61 @@
+{
+ "script": "l2_listen.py",
+ "port": "mon0",
+ "time": "2026-10-08T15:08:31+02:00",
+ "ntp_synchronized": true,
+ "script_md5": null,
+ "result": {
+  "iface": "mon0",
+  "timeout_s": 65.0,
+  "listened_s": 65.0,
+  "aborted": false,
+  "stopped_early": false,
+  "hello": null,
+  "frames": 4,
+  "neighbors": [
+   {
+    "proto": "CDP",
+    "ttl": 121,
+    "mgmt": [],
+    "system_name": "CRS328",
+    "port_id": "ether17",
+    "system_descr": "7.24.2 (stable) 2026-09-03 09:57:14",
+    "platform": "MikroTik",
+    "mac": "f4:1e:57:fd:dd:e8",
+    "origin": "FOREIGN",
+    "at_s": 9.0
+   },
+   {
+    "proto": "LLDP",
+    "mgmt": [
+     "fe80::f61e:57ff:fefd:dde8"
+    ],
+    "chassis_id": "f4:1e:57:fd:dd:d8",
+    "port_id": "ether17",
+    "ttl": 121,
+    "system_name": "CRS328",
+    "system_descr": "MikroTik RouterOS 7.24.2 (stable) 2026-09-03 09:57:14 CRS328-24P-4S+",
+    "caps": [
+     "router"
+    ],
+    "port_descr": "ether17",
+    "mac": "f4:1e:57:fd:dd:e8",
+    "origin": "FOREIGN",
+    "at_s": 9.0
+   }
+  ],
+  "stp": [],
+  "lacp": [],
+  "vlans": {},
+  "verdict": "PASS",
+  "short": "neighbour CRS328, port ether17, TTL 121 via CDP",
+  "output": [
+   "Listening on mon0 for up to 65 s: LLDP, CDP, STP, LACP, VLAN tags; sending nothing",
+   "HEARD CDP f4:1e:57:fd:dd:e8 FOREIGN CRS328, port ether17, TTL 121",
+   "HEARD LLDP f4:1e:57:fd:dd:e8 FOREIGN CRS328, port ether17 (ether17), mgmt fe80::f61e:57ff:fefd:dde8, TTL 121",
+   "Frames    : 4 in 65.0 s",
+   "Verdict   : PASS neighbour CRS328, port ether17, TTL 121 via CDP",
+   "RESULT l2_listen {\"iface\": \"mon0\", \"timeout_s\": 65.0, \"listened_s\": 65.0, \"aborted\": false, \"stopped_early\": false, \"hello\": null, \"frames\": 4, \"neighbors\": [{\"proto\": \"CDP\", \"ttl\": 121, \"mgmt\": [], \"system_name\": \"CRS328\", \"port_id\": \"ether17\", \"system_descr\": \"7.24.2 (stable) 2026-09-03 09:57:14\", \"platform\": \"MikroTik\", \"mac\": \"f4:1e:57:fd:dd:e8\", \"origin\": \"FOREIGN\", \"at_s\": 9.0}, {\"proto\": \"LLDP\", \"mgmt\": [\"fe80::f61e:57ff:fefd:dde8\"], \"chassis_id\": \"f4:1e:57:fd:dd:d8\", \"port_id\": \"ether17\", \"ttl\": 121, \"system_name\": \"CRS328\", \"system_descr\": \"MikroTik RouterOS 7.24.2 (stable) 2026-09-03 09:57:14 CRS328-24P-4S+\", \"caps\": [\"router\"], \"port_descr\": \"ether17\", \"mac\": \"f4:1e:57:fd:dd:e8\", \"origin\": \"FOREIGN\", \"at_s\": 9.0}], \"stp\": [], \"lacp\": [], \"vlans\": {}, \"verdict\": \"PASS\", \"short\": \"neighbour CRS328, port ether17, TTL 121 via CDP\"}"
+  ]
+ }
+}
