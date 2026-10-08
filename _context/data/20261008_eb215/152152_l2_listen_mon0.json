@@ -1,0 +1,66 @@
+{
+ "script": "l2_listen.py",
+ "port": "mon0",
+ "time": "2026-10-08T15:21:52+02:00",
+ "ntp_synchronized": true,
+ "script_md5": "9124a7232f08d30a3fb5253b2a0ac1b8",
+ "result": {
+  "iface": "mon0",
+  "timeout_s": 65.0,
+  "listened_s": 29.0,
+  "aborted": false,
+  "stopped_early": true,
+  "hello": null,
+  "frames": 17,
+  "neighbors": [
+   {
+    "proto": "CDP",
+    "ttl": 121,
+    "mgmt": [
+     "192.168.89.1"
+    ],
+    "system_name": "MKT-eb215",
+    "port_id": "bridge-nat/ether5",
+    "system_descr": "7.22 (stable) 2026-03-09 08:38:02",
+    "platform": "MikroTik",
+    "mac": "d4:01:c3:39:f6:51",
+    "origin": "FOREIGN",
+    "at_s": 28.9
+   },
+   {
+    "proto": "LLDP",
+    "mgmt": [
+     "192.168.89.1",
+     "fe80::d601:c3ff:fe39:f64e"
+    ],
+    "chassis_id": "d4:01:c3:39:f6:4d",
+    "port_id": "ether5",
+    "ttl": 121,
+    "system_name": "MKT-eb215",
+    "system_descr": "MikroTik RouterOS 7.22 (stable) 2026-03-09 08:38:02 L009UiGS-2HaxD",
+    "caps": [
+     "mac_bridge",
+     "router"
+    ],
+    "port_descr": "bridge-nat/ether5",
+    "mac": "d4:01:c3:39:f6:51",
+    "origin": "FOREIGN",
+    "at_s": 28.9
+   }
+  ],
+  "stp": [
+   {
+    "bridge": "d4:01:c3:39:f6:4e",
+    "root": "d4:01:c3:39:f6:4e",
+    "root_priority": 32768,
+    "version": "RSTP",
+    "from": "d4:01:c3:39:f6:51",
+    "at_s": 0.8
+   }
+  ],
+  "lacp": [],
+  "vlans": {},
+  "verdict": "PASS",
+  "short": "neighbour MKT-eb215, port bridge-nat/ether5, mgmt 192.168.89.1, TTL 121 via CDP"
+ }
+}
